@@ -1,1 +1,771 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>たのしい給食タイマー 🍛🥛</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Zen Maru Gothic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js for Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'kyoshoku-yellow': '#FFF3C4',
+                        'kyoshoku-orange': '#FF9F1C',
+                        'kyoshoku-red': '#E71D36',
+                        'kyoshoku-green': '#2EC4B6',
+                        'kyoshoku-blue': '#011627',
+                        'tray-bg': '#E2ECE9',
+                        'tray-border': '#B5C9C3'
+                    },
+                    fontFamily: {
+                        maru: ['"Zen Maru Gothic"', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #FFFDF0;
+            background-image: radial-gradient(#FFD166 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+        }
+
+        .food-layer {
+            transition: height 0.5s ease, clip-path 0.5s ease, opacity 0.5s ease;
+        }
+
+        .pulse-gentle {
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .bounce-gentle {
+            animation: bounce-animation 1.5s infinite;
+        }
+
+        @keyframes bounce-animation {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FFF3C4;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #FF9F1C;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col justify-between p-3 sm:p-6 select-none">
+
+    <!-- Top Header -->
+    <header class="max-w-6xl w-full mx-auto bg-white/90 backdrop-blur-md rounded-3xl p-4 shadow-lg border-4 border-amber-200 flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-amber-400 text-white rounded-2xl flex items-center justify-center text-2xl shadow-inner bounce-gentle">
+                🍱
+            </div>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black text-amber-800 tracking-wide">たのしい給食タイマー</h1>
+                <p class="text-xs sm:text-sm text-amber-600 font-bold">残りの時間と給食の残量がひと目でわかるよ！</p>
+            </div>
+        </div>
+
+        <!-- Right Header Controls -->
+        <div class="flex items-center gap-2 sm:gap-3 ml-auto">
+            <!-- Mute/Unmute Toggle -->
+            <button id="soundToggleBtn" onclick="toggleSound()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-2 rounded-2xl text-sm font-bold flex items-center gap-2 border-2 border-amber-300 transition">
+                <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+                <span id="soundText" class="hidden sm:inline">おと: ON</span>
+            </button>
+
+            <!-- Test Chime Button -->
+            <button onclick="playChime()" class="bg-teal-100 hover:bg-teal-200 text-teal-800 px-3 py-2 rounded-2xl text-sm font-bold flex items-center gap-2 border-2 border-teal-300 transition">
+                <i class="fa-solid fa-bell"></i>
+                <span class="hidden sm:inline">チャイム試聴</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-grow">
+
+        <!-- LEFT COLUMN: Timer & Controls (5 Cols on LG) -->
+        <div class="lg:col-span-5 flex flex-col justify-between gap-4 bg-white/95 backdrop-blur rounded-3xl p-5 sm:p-6 shadow-xl border-4 border-amber-200">
+            
+            <!-- Message Banner -->
+            <div id="statusBanner" class="bg-amber-100 text-amber-900 border-2 border-amber-300 rounded-2xl p-3 text-center font-bold text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2">
+                <span id="statusEmoji" class="text-xl">🥢</span>
+                <span id="statusText">給食の時間をセットしてスタートしよう！</span>
+            </div>
+
+            <!-- Big Digital Clock Display -->
+            <div class="my-2 text-center py-4 bg-amber-50/80 rounded-3xl border-4 border-dashed border-amber-300 relative overflow-hidden shadow-inner">
+                <div class="text-xs font-bold text-amber-600 mb-1 tracking-widest uppercase">REMAINING TIME / のこり時間</div>
+                <div id="timerDisplay" class="text-6xl sm:text-7xl font-black text-slate-800 tracking-wider font-mono drop-shadow">
+                    20:00
+                </div>
+                
+                <!-- Circular/Bar Progress Gauge -->
+                <div class="w-11/12 mx-auto mt-4 bg-slate-200 rounded-full h-4 overflow-hidden border border-slate-300">
+                    <div id="progressBar" class="bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 h-full w-full transition-all duration-500 rounded-full"></div>
+                </div>
+                <div class="flex justify-between w-11/12 mx-auto mt-1 text-xs font-bold text-slate-500">
+                    <span>給食の残り: <strong id="percentText" class="text-amber-700 text-sm">100%</strong></span>
+                    <span id="elapsedText">経過: 00:00</span>
+                </div>
+            </div>
+
+            <!-- Quick Time Set Presets -->
+            <div>
+                <label class="block text-xs font-bold text-amber-700 mb-2">⏱️ じかんをえらぶ (分)</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="setTimerMinutes(15)" class="preset-btn bg-amber-100 hover:bg-amber-300 text-amber-900 font-bold py-2.5 rounded-2xl border-2 border-amber-300 text-sm active:scale-95 transition">15分</button>
+                    <button onclick="setTimerMinutes(20)" class="preset-btn bg-amber-100 hover:bg-amber-300 text-amber-900 font-bold py-2.5 rounded-2xl border-2 border-amber-300 text-sm active:scale-95 transition">20分</button>
+                    <button onclick="setTimerMinutes(25)" class="preset-btn bg-amber-100 hover:bg-amber-300 text-amber-900 font-bold py-2.5 rounded-2xl border-2 border-amber-300 text-sm active:scale-95 transition">25分</button>
+                    <button onclick="setTimerMinutes(30)" class="preset-btn bg-amber-100 hover:bg-amber-300 text-amber-900 font-bold py-2.5 rounded-2xl border-2 border-amber-300 text-sm active:scale-95 transition">30分</button>
+                </div>
+            </div>
+
+            <!-- Fine Tuning Adjustments (+ / - Time) -->
+            <div class="flex gap-2">
+                <button onclick="adjustTime(-60)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl border border-slate-300 text-xs active:scale-95 transition">
+                    <i class="fa-solid fa-minus"></i> 1分減らす
+                </button>
+                <button onclick="adjustTime(60)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl border border-slate-300 text-xs active:scale-95 transition">
+                    <i class="fa-solid fa-plus"></i> 1分増やす
+                </button>
+            </div>
+
+            <!-- Main Control Action Buttons -->
+            <div class="flex gap-3 pt-2">
+                <button id="startPauseBtn" onclick="toggleTimer()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg sm:text-xl py-3.5 px-4 rounded-2xl shadow-lg border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1 transition flex items-center justify-center gap-2">
+                    <i id="playIcon" class="fa-solid fa-play"></i>
+                    <span id="playText">スタート</span>
+                </button>
+                <button onclick="resetTimer()" class="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold py-3.5 px-5 rounded-2xl border-2 border-rose-300 active:scale-95 transition flex items-center justify-center gap-2" title="リセット">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>やりなおす</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Graphical Lunch Tray Display (7 Cols on LG) -->
+        <div class="lg:col-span-7 flex flex-col justify-between bg-white/95 backdrop-blur rounded-3xl p-5 sm:p-6 shadow-xl border-4 border-amber-200 relative overflow-hidden">
+            
+            <!-- Menu Selector Tabs Header -->
+            <div class="flex items-center justify-between gap-2 border-b-2 border-amber-100 pb-3 mb-2 flex-wrap">
+                <div class="text-sm font-extrabold text-amber-900 flex items-center gap-1.5">
+                    <span>🍽️ こんげつのメニュー:</span>
+                </div>
+                <!-- Menu Options -->
+                <div class="flex gap-1.5 bg-amber-50 p-1 rounded-2xl border border-amber-200">
+                    <button onclick="switchMenu('curry')" id="menuTab-curry" class="menu-tab text-xs font-bold px-3 py-1.5 rounded-xl transition bg-amber-400 text-amber-950 shadow-sm">
+                        🍛 カレー
+                    </button>
+                    <button onclick="switchMenu('bread')" id="menuTab-bread" class="menu-tab text-xs font-bold px-3 py-1.5 rounded-xl transition text-slate-600 hover:bg-amber-100">
+                        🥖 揚げパン
+                    </button>
+                    <button onclick="switchMenu('japanese')" id="menuTab-japanese" class="menu-tab text-xs font-bold px-3 py-1.5 rounded-xl transition text-slate-600 hover:bg-amber-100">
+                        🐟 和食
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lunch Tray Area (Graphics Container) -->
+            <div class="relative w-full aspect-[4/3] max-h-[420px] my-auto bg-slate-200/80 rounded-3xl border-8 border-slate-300 p-4 shadow-inner flex flex-col justify-between overflow-hidden">
+                
+                <!-- Tray Inner Rim Glow/Shadow -->
+                <div class="absolute inset-2 border-2 border-white/60 rounded-2xl pointer-events-none"></div>
+
+                <!-- Complete Badge Overlay (Hidden by default) -->
+                <div id="completedOverlay" class="hidden absolute inset-0 bg-amber-500/90 backdrop-blur-sm z-30 flex-col items-center justify-center text-white text-center p-6 rounded-2xl transition-all">
+                    <div class="text-6xl mb-3 animate-bounce">🎉</div>
+                    <h2 class="text-3xl font-black mb-2 drop-shadow">ごちそうさでした！</h2>
+                    <p class="text-base font-bold bg-white/20 px-4 py-2 rounded-full">ピッカピカに完食！時間内にたべられたね！</p>
+                    <button onclick="resetTimer()" class="mt-6 bg-white text-amber-800 font-extrabold px-6 py-2.5 rounded-full shadow-lg hover:bg-amber-50 transition active:scale-95">
+                        もういちどセットする
+                    </button>
+                </div>
+
+                <!-- SVG LUNCH GRAPHIC DISHES GRID -->
+                <svg viewBox="0 0 800 600" class="w-full h-full drop-shadow-md select-none">
+                    <defs>
+                        <!-- Clip Paths for Eating Animation (Shrinking Food Layers) -->
+                        <clipPath id="clip-main-food">
+                            <rect id="rect-main-food" x="0" y="0" width="800" height="600" />
+                        </clipPath>
+                        <clipPath id="clip-side-food">
+                            <rect id="rect-side-food" x="0" y="0" width="800" height="600" />
+                        </clipPath>
+                        <clipPath id="clip-milk">
+                            <rect id="rect-milk" x="0" y="0" width="800" height="600" />
+                        </clipPath>
+                        <clipPath id="clip-dessert">
+                            <rect id="rect-dessert" x="0" y="0" width="800" height="600" />
+                        </clipPath>
+
+                        <!-- Drop Shadows & Gradients -->
+                        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+                            <feDropShadow dx="0" dy="6" stdDeviation="4" flood-opacity="0.15" />
+                        </filter>
+                    </defs>
+
+                    <!-- TRAY BG DETAILS -->
+                    <rect x="20" y="20" width="760" height="560" rx="30" fill="#E8EFEF" stroke="#C3D3CF" stroke-width="6" />
+
+                    <!-- ================= DISH 1: MAIN DISH (Bottom Left Large Plate) ================= -->
+                    <g id="dish-main-group" filter="url(#shadow)">
+                        <!-- Plate Base -->
+                        <ellipse cx="270" cy="380" rx="210" ry="140" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="8" />
+                        <ellipse cx="270" cy="380" rx="180" ry="115" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="4" />
+
+                        <!-- FOOD CONTENT CONTAINER (Main Dish) -->
+                        <g clip-path="url(#clip-main-food)" class="food-layer">
+                            
+                            <!-- 1. Curry Rice Graphics -->
+                            <g id="food-curry" class="menu-food-item">
+                                <!-- Rice Base -->
+                                <path d="M 120,380 C 120,290 270,280 270,380 C 270,450 120,460 120,380 Z" fill="#FFFDF0" />
+                                <ellipse cx="190" cy="370" rx="70" ry="50" fill="#FFFFFF" />
+                                <!-- Rice Texture Dots -->
+                                <circle cx="170" cy="350" r="3" fill="#E5E7EB"/>
+                                <circle cx="210" cy="370" r="3" fill="#E5E7EB"/>
+                                <circle cx="180" cy="390" r="3" fill="#E5E7EB"/>
+                                <!-- Curry Sauce -->
+                                <path d="M 240,320 C 330,300 450,340 430,410 C 410,480 260,470 240,410 Z" fill="#C66900" />
+                                <path d="M 260,335 C 330,310 430,350 410,410 C 390,460 270,450 260,400 Z" fill="#E67E22" />
+                                <!-- Vegetables / Meat Chunks -->
+                                <rect x="300" y="350" width="28" height="24" rx="6" fill="#E74C3C" transform="rotate(12, 300, 350)"/> <!-- Carrot -->
+                                <rect x="350" y="380" width="32" height="28" rx="8" fill="#F1C40F" transform="rotate(-15, 350, 380)"/> <!-- Potato -->
+                                <circle cx="290" cy="410" r="14" fill="#7E5109" /> <!-- Meat -->
+                                <circle cx="370" cy="350" r="6" fill="#2ECC71" /> <!-- Green Pea -->
+                                <circle cx="340" cy="420" r="6" fill="#2ECC71" /> <!-- Green Pea -->
+                            </g>
+
+                            <!-- 2. Fried Bread Graphics (Hidden initially) -->
+                            <g id="food-bread" class="menu-food-item hidden">
+                                <!-- Cream Stew Bowl Portion -->
+                                <path d="M 100,380 C 100,300 280,300 280,380 C 280,450 100,450 100,380 Z" fill="#FFF8DC" />
+                                <circle cx="160" cy="360" r="10" fill="#E74C3C" /> <!-- Carrot -->
+                                <circle cx="210" cy="390" r="12" fill="#2ECC71" /> <!-- Broccoli -->
+                                <circle cx="220" cy="350" r="14" fill="#F1C40F" /> <!-- Corn/Potato -->
+                                <!-- Fried Bread (Agepan) -->
+                                <g transform="translate(240, 290) rotate(-10)">
+                                    <rect x="0" y="0" width="220" height="100" rx="50" fill="#D35400" stroke="#A04000" stroke-width="4"/>
+                                    <rect x="10" y="10" width="200" height="80" rx="40" fill="#E67E22" />
+                                    <!-- Kinako Sugar Powder Sprinkle -->
+                                    <circle cx="50" cy="40" r="2" fill="#FFF" /><circle cx="90" cy="30" r="3" fill="#FFF" />
+                                    <circle cx="130" cy="60" r="2" fill="#FFF" /><circle cx="170" cy="45" r="3" fill="#FFF" />
+                                    <circle cx="70" cy="70" r="2" fill="#FFF" /><circle cx="120" cy="35" r="2" fill="#FFF" />
+                                </g>
+                            </g>
+
+                            <!-- 3. Japanese Meal (Fish & Rice Graphics) -->
+                            <g id="food-japanese" class="menu-food-item hidden">
+                                <!-- Rice Bowl Side -->
+                                <path d="M 100,390 C 100,320 250,320 250,390 C 250,450 100,450 100,390 Z" fill="#FFFFFF" />
+                                <ellipse cx="175" cy="370" rx="65" ry="40" fill="#F9FAFB" />
+                                <circle cx="175" cy="365" r="6" fill="#C0392B" /> <!-- Umeboshi Plum -->
+                                <!-- Grilled Salmon (Shake) -->
+                                <g transform="translate(250, 310) rotate(15)">
+                                    <path d="M 10,20 Q 90,-10 170,30 Q 150,90 20,80 Z" fill="#FF7F50" stroke="#D35400" stroke-width="4"/>
+                                    <path d="M 20,30 Q 80,10 150,40 Q 135,75 30,70 Z" fill="#FF9E7D" />
+                                    <!-- Grill Marks -->
+                                    <line x1="50" y1="20" x2="60" y2="70" stroke="#7E5109" stroke-width="3" opacity="0.6"/>
+                                    <line x1="90" y1="20" x2="100" y2="70" stroke="#7E5109" stroke-width="3" opacity="0.6"/>
+                                    <line x1="130" y1="25" x2="135" y2="65" stroke="#7E5109" stroke-width="3" opacity="0.6"/>
+                                </g>
+                            </g>
+
+                        </g>
+
+                        <!-- Empty Plate Bottom Decoration (Shows when eaten) -->
+                        <text x="270" y="390" text-anchor="middle" fill="#9CA3AF" font-size="28" font-weight="bold" opacity="0.5">ごちそうさま！</text>
+                    </g>
+
+
+                    <!-- ================= DISH 2: SIDE DISH / SALAD / SOUP (Top Left Plate) ================= -->
+                    <g id="dish-side-group" filter="url(#shadow)">
+                        <circle cx="230" cy="160" r="100" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="6" />
+                        <circle cx="230" cy="160" r="85" fill="#F3F4F6" />
+
+                        <!-- FOOD CONTENT (Side Salad or Soup) -->
+                        <g clip-path="url(#clip-side-food)" class="food-layer">
+                            
+                            <!-- Salad (For Curry) -->
+                            <g id="side-salad" class="menu-side-item">
+                                <!-- Cabbage Greens -->
+                                <circle cx="210" cy="150" r="45" fill="#2ECC71" />
+                                <circle cx="250" cy="165" r="40" fill="#27AE60" />
+                                <circle cx="225" cy="180" r="35" fill="#A3E635" />
+                                <!-- Corn Kernels -->
+                                <circle cx="200" cy="140" r="8" fill="#F1C40F" />
+                                <circle cx="220" cy="130" r="7" fill="#F1C40F" />
+                                <circle cx="240" cy="145" r="8" fill="#F1C40F" />
+                                <circle cx="255" cy="170" r="7" fill="#F1C40F" />
+                                <!-- Tomato Wedge -->
+                                <path d="M 210,170 A 25,25 0 0,0 245,195 Z" fill="#E74C3C" />
+                            </g>
+
+                            <!-- Miso Soup (For Japanese Meal) -->
+                            <g id="side-soup" class="menu-side-item hidden">
+                                <circle cx="230" cy="160" r="85" fill="#795548" /> <!-- Miso Soup Broth -->
+                                <circle cx="230" cy="160" r="75" fill="#8D6E63" />
+                                <!-- Tofu Cubes -->
+                                <rect x="190" y="140" width="22" height="22" rx="3" fill="#FFFDF0"/>
+                                <rect x="235" y="165" width="20" height="20" rx="3" fill="#FFFDF0"/>
+                                <rect x="220" y="125" width="18" height="18" rx="3" fill="#FFFDF0"/>
+                                <!-- Wakame Seaweed -->
+                                <path d="M 200,175 Q 210,190 225,180 T 240,190" fill="none" stroke="#1E392A" stroke-width="8" stroke-linecap="round"/>
+                                <!-- Green Onion Slices -->
+                                <circle cx="185" cy="135" r="5" fill="#2ECC71"/>
+                                <circle cx="255" cy="145" r="5" fill="#2ECC71"/>
+                                <circle cx="215" cy="165" r="5" fill="#2ECC71"/>
+                            </g>
+
+                        </g>
+                        <text x="230" y="165" text-anchor="middle" fill="#9CA3AF" font-size="18" font-weight="bold" opacity="0.5">かんしょく</text>
+                    </g>
+
+
+                    <!-- ================= DISH 3: MILK CARTON (Top Right) ================= -->
+                    <g id="dish-milk-group" filter="url(#shadow)" transform="translate(520, 50)">
+                        <!-- Milk Pack Container Outline -->
+                        <rect x="40" y="60" width="120" height="170" rx="12" fill="#3B82F6" stroke="#1D4ED8" stroke-width="5" />
+                        <path d="M 40,60 L 100,10 L 160,60 Z" fill="#2563EB" stroke="#1D4ED8" stroke-width="5"/>
+                        <rect x="80" y="5" width="40" height="15" rx="3" fill="#1E40AF"/>
+
+                        <!-- Milk Pack Design -->
+                        <rect x="50" y="80" width="100" height="130" rx="6" fill="#FFFFFF" />
+                        <text x="100" y="125" text-anchor="middle" fill="#2563EB" font-size="22" font-weight="900">ぎゅうにゅう</text>
+                        <text x="100" y="150" text-anchor="middle" fill="#60A5FA" font-size="14" font-weight="bold">MILK</text>
+                        <!-- Cow Silhouette Icon -->
+                        <path d="M 85,175 C 85,165 115,165 115,175 C 115,185 85,185 85,175 Z" fill="#3B82F6"/>
+
+                        <!-- LIQUID CONTENT (Milk Liquid Bar Cutout) -->
+                        <g clip-path="url(#clip-milk)" class="food-layer">
+                            <!-- Milk White Liquid Level Representation -->
+                            <rect id="milk-liquid" x="42" y="62" width="116" height="166" fill="#60A5FA" opacity="0.35"/>
+                        </g>
+                        <text x="100" y="210" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">200ml</text>
+                    </g>
+
+
+                    <!-- ================= DISH 4: DESSERT / FRUIT (Bottom Right) ================= -->
+                    <g id="dish-dessert-group" filter="url(#shadow)">
+                        <circle cx="600" cy="400" r="90" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="6"/>
+                        <circle cx="600" cy="400" r="75" fill="#FEF3C7"/>
+
+                        <!-- DESSERT CONTENT -->
+                        <g clip-path="url(#clip-dessert)" class="food-layer">
+                            
+                            <!-- Pudding Dessert (Curry Menu) -->
+                            <g id="dessert-pudding" class="menu-dessert-item">
+                                <!-- Pudding Body -->
+                                <path d="M 560,420 L 570,360 Q 600,350 630,360 L 640,420 Z" fill="#FAC800" stroke="#E6A100" stroke-width="3"/>
+                                <!-- Caramel Topping -->
+                                <path d="M 570,360 Q 600,350 630,360 L 625,380 Q 600,375 575,380 Z" fill="#6E3B00"/>
+                                <!-- Cherry on Top -->
+                                <circle cx="600" cy="340" r="12" fill="#E74C3C"/>
+                                <path d="M 600,328 Q 615,310 620,305" fill="none" stroke="#27AE60" stroke-width="3" stroke-linecap="round"/>
+                            </g>
+
+                            <!-- Banana Fruit (Bread Menu) -->
+                            <g id="dessert-banana" class="menu-dessert-item hidden">
+                                <g transform="translate(540, 350) rotate(-20)">
+                                    <path d="M 10,20 Q 60,90 120,40 Q 60,65 10,20 Z" fill="#F1C40F" stroke="#F39C12" stroke-width="4"/>
+                                    <path d="M 0,15 L 10,20 L 5,28 Z" fill="#7E5109"/> <!-- Stem -->
+                                    <path d="M 120,40 L 128,45 L 122,50 Z" fill="#7E5109"/> <!-- Tip -->
+                                </g>
+                            </g>
+
+                            <!-- Apple Slice (Japanese Menu) -->
+                            <g id="dessert-apple" class="menu-dessert-item hidden">
+                                <g transform="translate(540, 340)">
+                                    <path d="M 20,70 Q 60,10 100,70 Q 60,85 20,70 Z" fill="#E74C3C" stroke="#C0392B" stroke-width="3"/>
+                                    <path d="M 30,65 Q 60,25 90,65 Q 60,75 30,65 Z" fill="#FFFDD0" /> <!-- Flesh -->
+                                    <circle cx="60" cy="50" r="3" fill="#7E5109"/> <!-- Seed -->
+                                </g>
+                            </g>
+
+                        </g>
+                        <text x="600" y="405" text-anchor="middle" fill="#9CA3AF" font-size="16" font-weight="bold" opacity="0.5">ぴかぴか</text>
+                    </g>
+
+                </svg>
+            </div>
+
+            <!-- Bottom Helper Text & Quick Status -->
+            <div class="mt-3 flex items-center justify-between text-xs font-bold text-amber-800 bg-amber-50 p-3 rounded-2xl border border-amber-200">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">💡</span>
+                    <span>時間がたつと、給食の料理がすこしずつへっていくよ！</span>
+                </div>
+                <div id="eatingStatusBadge" class="bg-amber-200 text-amber-900 px-2.5 py-1 rounded-xl">
+                    いただきます前
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer Credit -->
+    <footer class="mt-4 text-center text-xs font-bold text-amber-700/70">
+        たのしく残さず食べよう！ 給食時間サポートタイマー
+    </footer>
+
+
+    <script>
+        // =================================================================
+        // STATE VARIABLES
+        // =================================================================
+        let totalSeconds = 20 * 60;   // Default 20 minutes
+        let remainingSeconds = 20 * 60;
+        let timerInterval = null;
+        let isRunning = false;
+        let isMuted = false;
+        let currentMenu = 'curry';    // 'curry', 'bread', 'japanese'
+
+        // Audio synthesizer initializations via Tone.js
+        let synth = null;
+
+        // Initialize Tone Synth on first user interaction
+        function initAudio() {
+            if (!synth && typeof Tone !== 'undefined') {
+                synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                synth.volume.value = -6; // Moderate volume
+            }
+        }
+
+        // DOM Element References
+        const timerDisplay = document.getElementById('timerDisplay');
+        const progressBar = document.getElementById('progressBar');
+        const percentText = document.getElementById('percentText');
+        const elapsedText = document.getElementById('elapsedText');
+        const startPauseBtn = document.getElementById('startPauseBtn');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+        const statusBanner = document.getElementById('statusBanner');
+        const statusEmoji = document.getElementById('statusEmoji');
+        const statusText = document.getElementById('statusText');
+        const eatingStatusBadge = document.getElementById('eatingStatusBadge');
+        const completedOverlay = document.getElementById('completedOverlay');
+
+        // SVG Rectangles for Clipping (Food Eating Progression)
+        const rectMainFood = document.getElementById('rect-main-food');
+        const rectSideFood = document.getElementById('rect-side-food');
+        const rectMilk = document.getElementById('rect-milk');
+        const rectDessert = document.getElementById('rect-dessert');
+
+        // =================================================================
+        // TIMER CORE FUNCTIONS
+        // =================================================================
+
+        function updateDisplay() {
+            // Minutes & Seconds calculation
+            const mins = Math.floor(remainingSeconds / 60);
+            const secs = remainingSeconds % 60;
+            timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            // Progress percentage
+            const ratio = totalSeconds > 0 ? (remainingSeconds / totalSeconds) : 0;
+            const percentage = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+            
+            // Progress Bar Width
+            progressBar.style.width = `${percentage}%`;
+            percentText.textContent = `${percentage}%`;
+
+            // Elapsed time text
+            const elapsed = totalSeconds - remainingSeconds;
+            const elMins = Math.floor(elapsed / 60);
+            const elSecs = elapsed % 60;
+            elapsedText.textContent = `経過: ${String(elMins).padStart(2, '0')}:${String(elSecs).padStart(2, '0')}`;
+
+            // Update Graphical Food Items Clipping (Simulate eating)
+            updateFoodGraphicProgress(ratio);
+
+            // Update Status Messages based on remaining percentage
+            updateStatusMessages(percentage);
+        }
+
+        /* Update Graphical Food Layers based on Time Ratio (1.0 -> 0.0) */
+        function updateFoodGraphicProgress(ratio) {
+            // ratio: 1.0 (Full) -> 0.0 (Empty)
+            // As ratio decreases, shrink rect bounds from top or sides to represent consumption
+
+            // 1. Milk Level Decreases smoothly throughout entire duration (Y: 0 to 600)
+            const milkY = 600 * (1 - ratio);
+            rectMilk.setAttribute('y', milkY);
+
+            // 2. Main Dish is eaten gradually (from 100% to 10% remaining)
+            const mainHeight = 600 * ratio;
+            rectMainFood.setAttribute('height', mainHeight);
+
+            // 3. Side Dish is eaten slightly faster (100% to 30% ratio)
+            const sideRatio = Math.max(0, (ratio - 0.2) / 0.8);
+            rectSideFood.setAttribute('height', 600 * sideRatio);
+
+            // 4. Dessert is saved for the end! (Starts getting eaten under 40% ratio)
+            const dessertRatio = Math.max(0, ratio / 0.5);
+            rectDessert.setAttribute('height', 600 * Math.min(1, dessertRatio));
+        }
+
+        /* Dynamic Status Messages depending on time left */
+        function updateStatusMessages(percentage) {
+            if (!isRunning && remainingSeconds === totalSeconds) {
+                statusBanner.className = "bg-amber-100 text-amber-900 border-2 border-amber-300 rounded-2xl p-3 text-center font-bold text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2";
+                statusEmoji.textContent = "🥢";
+                statusText.textContent = "「いただきます」の準備はできたかな？スタートを押そう！";
+                eatingStatusBadge.textContent = "準備中";
+                return;
+            }
+
+            if (percentage > 75) {
+                statusBanner.className = "bg-emerald-100 text-emerald-900 border-2 border-emerald-300 rounded-2xl p-3 text-center font-bold text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2";
+                statusEmoji.textContent = "😋";
+                statusText.textContent = "もぐもぐタイム！ よくかんで味わって食べようね。";
+                eatingStatusBadge.textContent = "もぐもぐタイム";
+            } else if (percentage > 40) {
+                statusBanner.className = "bg-sky-100 text-sky-900 border-2 border-sky-300 rounded-2xl p-3 text-center font-bold text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2";
+                statusEmoji.textContent = "🥛";
+                statusText.textContent = "順調だよ！牛乳やお汁ものもバランスよくね。";
+                eatingStatusBadge.textContent = "半分クリア！";
+            } else if (percentage > 15) {
+                statusBanner.className = "bg-orange-100 text-orange-900 border-2 border-orange-300 rounded-2xl p-3 text-center font-bold text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2";
+                statusEmoji.textContent = "✨";
+                statusText.textContent = "あともう少し！おかわり・片付けの準備をはじめよう。";
+                eatingStatusBadge.textContent = "ラストスパート";
+            } else if (percentage > 0) {
+                statusBanner.className = "bg-rose-100 text-rose-900 border-2 border-rose-300 rounded-2xl p-3 text-center font-bold text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2 pulse-gentle";
+                statusEmoji.textContent = "⏰";
+                statusText.textContent = "まもなく終了時間だよ！お皿をきれいにしよう！";
+                eatingStatusBadge.textContent = "のこりわずか！";
+            } else {
+                statusBanner.className = "bg-purple-100 text-purple-900 border-2 border-purple-300 rounded-2xl p-3 text-center font-bold text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2";
+                statusEmoji.textContent = "🎉";
+                statusText.textContent = "給食終了時間です！「ごちそうさまでした」をしよう！";
+                eatingStatusBadge.textContent = "ごちそうさま！";
+            }
+        }
+
+        function toggleTimer() {
+            initAudio();
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            if (remainingSeconds <= 0) return;
+            
+            isRunning = true;
+            playIcon.className = "fa-solid fa-pause";
+            playText.textContent = "一時停止";
+            startPauseBtn.className = "flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-lg sm:text-xl py-3.5 px-4 rounded-2xl shadow-lg border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 transition flex items-center justify-center gap-2";
+
+            completedOverlay.classList.add('hidden');
+            completedOverlay.classList.remove('flex');
+
+            playToneNotification('start');
+
+            timerInterval = setInterval(() => {
+                if (remainingSeconds > 0) {
+                    remainingSeconds--;
+                    updateDisplay();
+
+                    // Countdown chime for last 5 seconds
+                    if (remainingSeconds <= 5 && remainingSeconds > 0) {
+                        playToneNotification('tick');
+                    }
+                } else {
+                    finishTimer();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            playIcon.className = "fa-solid fa-play";
+            playText.textContent = "再開する";
+            startPauseBtn.className = "flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg sm:text-xl py-3.5 px-4 rounded-2xl shadow-lg border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1 transition flex items-center justify-center gap-2";
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            remainingSeconds = totalSeconds;
+            playText.textContent = "スタート";
+            completedOverlay.classList.add('hidden');
+            completedOverlay.classList.remove('flex');
+            updateDisplay();
+        }
+
+        function setTimerMinutes(mins) {
+            totalSeconds = mins * 60;
+            remainingSeconds = totalSeconds;
+            resetTimer();
+        }
+
+        function adjustTime(seconds) {
+            totalSeconds = Math.max(60, totalSeconds + seconds);
+            remainingSeconds = Math.max(0, remainingSeconds + seconds);
+            updateDisplay();
+        }
+
+        function finishTimer() {
+            pauseTimer();
+            playChime();
+            
+            // Trigger Confetti Celebration
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            // Show Complete Overlay
+            completedOverlay.classList.remove('hidden');
+            completedOverlay.classList.add('flex');
+        }
+
+        // =================================================================
+        // MENU SWITCHING LOGIC
+        // =================================================================
+        function switchMenu(menuKey) {
+            currentMenu = menuKey;
+
+            // Highlight Tab Buttons
+            document.querySelectorAll('.menu-tab').forEach(btn => {
+                btn.className = "menu-tab text-xs font-bold px-3 py-1.5 rounded-xl transition text-slate-600 hover:bg-amber-100";
+            });
+            const activeTab = document.getElementById(`menuTab-${menuKey}`);
+            if (activeTab) {
+                activeTab.className = "menu-tab text-xs font-bold px-3 py-1.5 rounded-xl transition bg-amber-400 text-amber-950 shadow-sm";
+            }
+
+            // Hide all food variants
+            document.querySelectorAll('.menu-food-item, .menu-side-item, .menu-dessert-item').forEach(el => {
+                el.classList.add('hidden');
+            });
+
+            // Show selected dish elements
+            if (menuKey === 'curry') {
+                document.getElementById('food-curry').classList.remove('hidden');
+                document.getElementById('side-salad').classList.remove('hidden');
+                document.getElementById('dessert-pudding').classList.remove('hidden');
+            } else if (menuKey === 'bread') {
+                document.getElementById('food-bread').classList.remove('hidden');
+                document.getElementById('side-salad').classList.remove('hidden');
+                document.getElementById('dessert-banana').classList.remove('hidden');
+            } else if (menuKey === 'japanese') {
+                document.getElementById('food-japanese').classList.remove('hidden');
+                document.getElementById('side-soup').classList.remove('hidden');
+                document.getElementById('dessert-apple').classList.remove('hidden');
+            }
+        }
+
+        // =================================================================
+        // SOUND EFFECTS & CHIME FUNCTIONS (Tone.js)
+        // =================================================================
+        function toggleSound() {
+            isMuted = !isMuted;
+            const soundIcon = document.getElementById('soundIcon');
+            const soundText = document.getElementById('soundText');
+
+            if (isMuted) {
+                soundIcon.className = "fa-solid fa-volume-xmark text-rose-500";
+                soundText.textContent = "おと: OFF";
+            } else {
+                soundIcon.className = "fa-solid fa-volume-high text-amber-800";
+                soundText.textContent = "おと: ON";
+                initAudio();
+                playToneNotification('start');
+            }
+        }
+
+        function playToneNotification(type) {
+            if (isMuted || typeof Tone === 'undefined') return;
+            initAudio();
+
+            try {
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+
+                const now = Tone.now();
+                if (type === 'start') {
+                    synth.triggerAttackRelease(["C5", "G5"], "8n", now);
+                } else if (type === 'tick') {
+                    synth.triggerAttackRelease("A5", "16n", now);
+                }
+            } catch (e) {
+                console.log("Audio play error:", e);
+            }
+        }
+
+        /* School Chime Sound Effect ("Ding-Dong-Dang-Dong") */
+        function playChime() {
+            if (isMuted || typeof Tone === 'undefined') return;
+            initAudio();
+
+            try {
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+
+                const now = Tone.now();
+                // Japanese School Chime melody (Westminster Chimes variation)
+                // C4 -> E4 -> D4 -> G3 ... C4 -> D4 -> E4 -> C4
+                synth.triggerAttackRelease("F4", "0.6", now);
+                synth.triggerAttackRelease("A4", "0.6", now + 0.6);
+                synth.triggerAttackRelease("G4", "0.6", now + 1.2);
+                synth.triggerAttackRelease("C4", "0.8", now + 1.8);
+
+                synth.triggerAttackRelease("F4", "0.6", now + 2.8);
+                synth.triggerAttackRelease("G4", "0.6", now + 3.4);
+                synth.triggerAttackRelease("A4", "0.6", now + 4.0);
+                synth.triggerAttackRelease("F4", "0.8", now + 4.6);
+            } catch (e) {
+                console.log("Chime error:", e);
+            }
+        }
+
+        // Initialize on Page Load
+        window.onload = function() {
+            updateDisplay();
+        };
+    </script>
+</body>
+</html>
