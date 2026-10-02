@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>たのしいローマ字れんしゅう（3年生）</title>
+  <style>
+    :root {
+      --primary: #FF6B6B;
+      --secondary: #4ECDC4;
+      --accent: #FFE66D;
+      --dark: #2C3E50;
+      --light: #F7F9FC;
+      --card-bg: #FFFFFF;
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Hiragino Kaku Gothic ProN', 'メイリオ', sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background: linear-gradient(135deg, #e0f7fa 0%, #fff9c4 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 15px;
+      color: var(--dark);
+    }
+
+    header {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      background: white;
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      color: #FF5252;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .controls-top {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      background: #f0f0f0;
+      border: 2px solid #ddd;
+      padding: 6px 14px;
+      border-radius: 50px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    /* カテゴリタブ */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      width: 100%;
+      max-width: 800px;
+      margin-bottom: 12px;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      white-space: nowrap;
+      background: white;
+      border: 2px solid #B2EBF2;
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-weight: bold;
+      color: #00838F;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .tab-btn.active {
+      background: #00ACC1;
+      color: white;
+      border-color: #00ACC1;
+    }
+
+    /* カードエリア */
+    .card-container {
+      width: 100%;
+      max-width: 800px;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      min-height: 380px;
+    }
+
+    .card-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .badge {
+      background: #E1F5FE;
+      color: #0288D1;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+
+    .progress-text {
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #555;
+    }
+
+    /* タイマーゲージ */
+    .timer-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: #eee;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .timer-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      transition: width 0.1s linear;
+    }
+
+    /* スライド問題・答え表示 */
+    .display-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      text-align: center;
+    }
+
+    .question-label {
+      font-size: 0.95rem;
+      color: #888;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    .main-prompt {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+    }
+
+    .main-prompt span.alt-code {
+      color: #FF5722;
+      font-size: 2.8rem;
+    }
+
+    /* キーキャップ表記 */
+    .keycap-list {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .keycap {
+      background: linear-gradient(180deg, #ffffff 0%, #e6e6e6 100%);
+      border: 2px solid #ccc;
+      border-bottom: 5px solid #bbb;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: #333;
+      box-shadow: 0 3px 0 rgba(0,0,0,0.1);
+    }
+
+    .keycap-alt {
+      background: #FFF3E0;
+      border-color: #FFB74D;
+      border-bottom-color: #FFA726;
+      color: #E65100;
+    }
+
+    /* 答えのアニメーションエリア */
+    .answer-area {
+      min-height: 90px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .answer-text {
+      font-size: 3.2rem;
+      font-weight: bold;
+      color: #E91E63;
+      opacity: 0;
+      transform: translateY(15px) scale(0.9);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .answer-text.show {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* フッターコントローラー */
+    .controls-bottom {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      background: white;
+      border: 2px solid #1E88E5;
+      color: #1E88E5;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .nav-btn:hover {
+      background: #1E88E5;
+      color: white;
+    }
+
+    .play-btn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 30px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(76,175,80,0.3);
+    }
+
+    .play-btn.paused {
+      background: #FF9800;
+    }
+
+    /* モーダル（カード一覧） */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: white;
+      width: 100%;
+      max-width: 700px;
+      max-height: 80vh;
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+      overflow-y: auto;
+      padding: 10px 0;
+    }
+
+    .grid-item {
+      border: 2px solid #eee;
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      background: #f9f9f9;
+    }
+
+    .grid-item:hover {
+      border-color: #00ACC1;
+      background: #E0F7FA;
+    }
+
+    .sub-note {
+      font-size: 0.8rem;
+      color: #E65100;
+      font-weight: bold;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>⌨️ たのしいローマ字れんしゅう（3年生）</h1>
+    <div class="controls-top">
+      <button class="btn" id="modeBtn" onclick="toggleMode()">🔄 モード: ローマ字➔ひらがな</button>
+      <button class="btn" id="speedBtn" onclick="cycleSpeed()">⏱️ 2秒間隔</button>
+      <button class="btn" id="soundBtn" onclick="toggleSound()">🔊 おと: ON</button>
+      <button class="btn" onclick="openModal()">📋 いちらん</button>
+    </div>
+  </header>
+
+  <!-- カテゴリタブ -->
+  <div class="tabs" id="categoryTabs"></div>
+
+  <!-- メインカード -->
+  <div class="card-container">
+    <div class="card-header">
+      <span class="badge" id="categoryBadge">きほん</span>
+      <span class="progress-text" id="progressText">1 / 10</span>
+    </div>
+
+    <!-- タイマーメーター -->
+    <div class="timer-bar-bg">
+      <div class="timer-bar-fill" id="timerBar"></div>
+    </div>
+
+    <!-- 問題・答え表示 -->
+    <div class="display-box">
+      <div class="question-label" id="questionLabel">ローマ字をみて ひらがなを かんがえよう！</div>
+      
+      <!-- メイン出題テキスト -->
+      <div class="main-prompt" id="mainPrompt">ka</div>
+      
+      <!-- 入力キーキャップのガイド -->
+      <div class="keycap-list" id="keycapList"></div>
+
+      <!-- 2秒後にあらわれる答え -->
+      <div class="answer-area">
+        <div class="answer-text" id="answerText">か</div>
+        <div class="sub-note" id="subNote"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下部操作ボタン -->
+  <div class="controls-bottom">
+    <button class="nav-btn" onclick="prevSlide()">◀ まえへ</button>
+    <button class="play-btn" id="playBtn" onclick="togglePlay()">⏸️ いちじていし</button>
+    <button class="nav-btn" onclick="nextSlide()">つぎへ ▶</button>
+  </div>
+
+  <!-- モーダル（カード一覧） -->
+  <div class="modal" id="listModal">
+    <div class="modal-content">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h2>カード一覧</h2>
+        <button class="btn" onclick="closeModal()">✕ とじる</button>
+      </div>
+      <div class="modal-grid" id="modalGrid"></div>
+    </div>
+  </div>
+
+<script>
+  // ローマ字データセット
+  const cardData = [
+    // 清音（きほん）
+    { cat: "きほん", hira: "あ", roma: "a", alt: "" },
+    { cat: "きほん", hira: "い", roma: "i", alt: "" },
+    { cat: "きほん", hira: "う", roma: "u", alt: "" },
+    { cat: "きほん", hira: "え", roma: "e", alt: "" },
+    { cat: "きほん", hira: "お", roma: "o", alt: "" },
+
+    { cat: "きほん", hira: "か", roma: "ka", alt: "" },
+    { cat: "きほん", hira: "き", roma: "ki", alt: "" },
+    { cat: "きほん", hira: "く", roma: "ku", alt: "" },
+    { cat: "きほん", hira: "け", roma: "ke", alt: "" },
+    { cat: "きほん", hira: "こ", roma: "ko", alt: "" },
+
+    { cat: "きほん", hira: "さ", roma: "sa", alt: "" },
+    { cat: "きほん", hira: "し", roma: "si", alt: "shi", note: "si または shi" },
+    { cat: "きほん", hira: "す", roma: "su", alt: "" },
+    { cat: "きほん", hira: "せ", roma: "se", alt: "" },
+    { cat: "きほん", hira: "そ", roma: "so", alt: "" },
+
+    { cat: "きほん", hira: "た", roma: "ta", alt: "" },
+    { cat: "きほん", hira: "ち", roma: "ti", alt: "chi", note: "ti または chi" },
+    { cat: "きほん", hira: "つ", roma: "tu", alt: "tsu", note: "tu または tsu" },
+    { cat: "きほん", hira: "て", roma: "te", alt: "" },
+    { cat: "きほん", hira: "と", roma: "to", alt: "" },
+
+    { cat: "きほん", hira: "な", roma: "na", alt: "" },
+    { cat: "きほん", hira: "に", roma: "ni", alt: "" },
+    { cat: "きほん", hira: "ぬ", roma: "nu", alt: "" },
+    { cat: "きほん", hira: "ね", roma: "ne", alt: "" },
+    { cat: "きほん", hira: "の", roma: "no", alt: "" },
+
+    { cat: "きほん", hira: "は", roma: "ha", alt: "" },
+    { cat: "きほん", hira: "ひ", roma: "hi", alt: "" },
+    { cat: "きほん", hira: "ふ", roma: "hu", alt: "fu", note: "hu または fu" },
+    { cat: "きほん", hira: "へ", roma: "he", alt: "" },
+    { cat: "きほん", hira: "ほ", roma: "ho", alt: "" },
+
+    { cat: "きほん", hira: "ま", roma: "ma", alt: "" },
+    { cat: "きほん", hira: "み", roma: "mi", alt: "" },
+    { cat: "きほん", hira: "む", roma: "mu", alt: "" },
+    { cat: "きほん", hira: "め", roma: "me", alt: "" },
+    { cat: "きほん", hira: "も", roma: "mo", alt: "" },
+
+    { cat: "きほん", hira: "や", roma: "ya", alt: "" },
+    { cat: "きほん", hira: "ゆ", roma: "yu", alt: "" },
+    { cat: "きほん", hira: "よ", roma: "yo", alt: "" },
+
+    { cat: "きほん", hira: "ら", roma: "ra", alt: "" },
+    { cat: "きほん", hira: "り", roma: "ri", alt: "" },
+    { cat: "きほん", hira: "る", roma: "ru", alt: "" },
+    { cat: "きほん", hira: "れ", roma: "re", alt: "" },
+    { cat: "きほん", hira: "ろ", roma: "ro", alt: "" },
+
+    { cat: "きほん", hira: "わ", roma: "wa", alt: "" },
+    { cat: "きほん", hira: "を", roma: "wo", alt: "" },
+    { cat: "きほん", hira: "ん", roma: "nn", alt: "n", note: "nn または n" },
+
+    // 濁音・半濁音
+    { cat: "だくおん", hira: "が", roma: "ga", alt: "" },
+    { cat: "だくおん", hira: "ぎ", roma: "gi", alt: "" },
+    { cat: "だくおん", hira: "ぐ", roma: "gu", alt: "" },
+    { cat: "だくおん", hira: "げ", roma: "ge", alt: "" },
+    { cat: "だくおん", hira: "ご", roma: "go", alt: "" },
+
+    { cat: "だくおん", hira: "ざ", roma: "za", alt: "" },
+    { cat: "だくおん", hira: "じ", roma: "zi", alt: "ji", note: "zi または ji" },
+    { cat: "だくおん", hira: "ず", roma: "zu", alt: "" },
+    { cat: "だくおん", hira: "ぜ", roma: "ze", alt: "" },
+    { cat: "だくおん", hira: "ぞ", roma: "zo", alt: "" },
+
+    { cat: "だくおん", hira: "だ", roma: "da", alt: "" },
+    { cat: "だくおん", hira: "ぢ", roma: "di", alt: "" },
+    { cat: "だくおん", hira: "づ", roma: "du", alt: "dzu", note: "du または dzu" },
+    { cat: "だくおん", hira: "で", roma: "de", alt: "" },
+    { cat: "だくおん", hira: "ど", roma: "do", alt: "" },
+
+    { cat: "だくおん", hira: "ば", roma: "ba", alt: "" },
+    { cat: "だくおん", hira: "ぱ", roma: "pa", alt: "" },
+
+    // 拗音
+    { cat: "ようおん", hira: "きゃ", roma: "kya", alt: "" },
+    { cat: "ようおん", hira: "きゅ", roma: "kyu", alt: "" },
+    { cat: "ようおん", hira: "きょ", roma: "kyo", alt: "" },
+
+    { cat: "ようおん", hira: "しゃ", roma: "sya", alt: "sha", note: "sya または sha" },
+    { cat: "ようおん", hira: "しゅ", roma: "syu", alt: "shu", note: "syu または shu" },
+    { cat: "ようおん", hira: "しょ", roma: "syo", alt: "sho", note: "syo または sho" },
+
+    { cat: "ようおん", hira: "ちゃ", roma: "tya", alt: "cha", note: "tya または cha" },
+    { cat: "ようおん", hira: "ちゅ", roma: "tyu", alt: "chu", note: "tyu または chu" },
+    { cat: "ようおん", hira: "ちょ", roma: "tyo", alt: "cho", note: "tyo または cho" },
+
+    { cat: "ようおん", hira: "にゃ", roma: "nya", alt: "" },
+    { cat: "ようおん", hira: "にゅ", roma: "nyu", alt: "" },
+    { cat: "ようおん", hira: "にょ", roma: "nyo", alt: "" },
+
+    { cat: "ようおん", hira: "ひゃ", roma: "hya", alt: "" },
+    { cat: "ようおん", hira: "ひゅ", roma: "hyu", alt: "" },
+    { cat: "ようおん", hira: "ひょ", roma: "hyo", alt: "" },
+
+    { cat: "ようおん", hira: "みゃ", roma: "mya", alt: "" },
+    { cat: "ようおん", hira: "みゅ", roma: "myu", alt: "" },
+    { cat: "ようおん", hira: "みょ", roma: "myo", alt: "" },
+
+    { cat: "ようおん", hira: "りゃ", roma: "rya", alt: "" },
+    { cat: "ようおん", hira: "りゅ", roma: "ryu", alt: "" },
+    { cat: "ようおん", hira: "りょ", roma: "ryo", alt: "" },
+
+    { cat: "ようおん", hira: "ぎゃ", roma: "gya", alt: "" },
+    { cat: "ようおん", hira: "ぎゅ", roma: "gyu", alt: "" },
+    { cat: "ようおん", hira: "ぎょ", roma: "gyo", alt: "" },
+
+    { cat: "ようおん", hira: "じゃ", roma: "zya", alt: "ja", note: "zya または ja" },
+    { cat: "ようおん", hira: "じゅ", roma: "zyu", alt: "ju", note: "zyu または ju" },
+    { cat: "ようおん", hira: "じょ", roma: "zyo", alt: "jo", note: "zyo または jo" },
+
+    { cat: "ようおん", hira: "ぢゃ", roma: "dya", alt: "zya", note: "dya または zya" },
+    { cat: "ようおん", hira: "ぢゅ", roma: "dyu", alt: "zyu", note: "dyu または zyu" },
+    { cat: "ようおん", hira: "ぢょ", roma: "dyo", alt: "zyo", note: "dyo または zyo" },
+
+    { cat: "ようおん", hira: "びゃ", roma: "bya", alt: "" },
+    { cat: "ようおん", hira: "びゅ", roma: "byu", alt: "" },
+    { cat: "ようおん", hira: "びょ", roma: "byo", alt: "" },
+
+    { cat: "ようおん", hira: "ぴゃ", roma: "pya", alt: "" },
+    { cat: "ようおん", hira: "ぴゅ", roma: "pyu", alt: "" },
+    { cat: "ようおん", hira: "ぴょ", roma: "pyo", alt: "" },
+
+    // 単語（ことば）
+    { cat: "たんご", hira: "そら", roma: "sora", alt: "" },
+    { cat: "たんご", hira: "ねこ", roma: "neko", alt: "" },
+    { cat: "たんご", hira: "さくら", roma: "sakura", alt: "" },
+    { cat: "たんご", hira: "すし", roma: "susi", alt: "sushi", note: "susi [sushi]" },
+    { cat: "たんご", hira: "ちけっと", roma: "tiketto", alt: "chiketto", note: "ti[chi]" },
+    { cat: "たんご", hira: "でんしゃ", roma: "densya", alt: "densha", note: "sya[sha]" }
+  ];
+
+  // アプリの状態
+  let currentCategory = "すべて";
+  let filteredList = [...cardData];
+  let currentIndex = 0;
+  let isRomaToHira = true;
+  let speedSeconds = 2; // 初期値2秒
+  let isPlaying = true;
+  let soundEnabled = true;
+
+  let timerInterval = null;
+  let progressTime = 0;
+
+  // DOM要素
+  const mainPromptEl = document.getElementById("mainPrompt");
+  const keycapListEl = document.getElementById("keycapList");
+  const answerTextEl = document.getElementById("answerText");
+  const subNoteEl = document.getElementById("subNote");
+  const timerBarEl = document.getElementById("timerBar");
+  const progressTextEl = document.getElementById("progressText");
+  const categoryBadgeEl = document.getElementById("categoryBadge");
+  const questionLabelEl = document.getElementById("questionLabel");
+  const playBtnEl = document.getElementById("playBtn");
+  const speedBtnEl = document.getElementById("speedBtn");
+  const modeBtnEl = document.getElementById("modeBtn");
+  const soundBtnEl = document.getElementById("soundBtn");
+
+  function init() {
+    renderTabs();
+    filterCategory("すべて");
+  }
+
+  function renderTabs() {
+    const categories = ["すべて", "きほん", "だくおん", "ようおん", "たんご"];
+    const tabsContainer = document.getElementById("categoryTabs");
+    tabsContainer.innerHTML = "";
+
+    categories.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = `tab-btn ${cat === currentCategory ? 'active' : ''}`;
+      btn.textContent = cat;
+      btn.onclick = () => filterCategory(cat);
+      tabsContainer.appendChild(btn);
+    });
+  }
+
+  function filterCategory(cat) {
+    currentCategory = cat;
+    renderTabs();
+
+    if (cat === "すべて") {
+      filteredList = [...cardData];
+    } else {
+      filteredList = cardData.filter(item => item.cat === cat);
+    }
+    currentIndex = 0;
+    loadSlide();
+  }
+
+  function loadSlide() {
+    clearInterval(timerInterval);
+    answerTextEl.classList.remove("show");
+    timerBarEl.style.width = "0%";
+    progressTime = 0;
+
+    const currentCard = filteredList[currentIndex];
+    categoryBadgeEl.textContent = currentCard.cat;
+    progressTextEl.textContent = `${currentIndex + 1} / ${filteredList.length}`;
+
+    if (isRomaToHira) {
+      questionLabelEl.textContent = "ローマ字をみて ひらがなを かんがえよう！";
+      
+      if (currentCard.alt) {
+        mainPromptEl.innerHTML = `${currentCard.roma} <span class="alt-code">[${currentCard.alt}]</span>`;
+      } else {
+        mainPromptEl.textContent = currentCard.roma;
+      }
+
+      answerTextEl.textContent = currentCard.hira;
+      renderKeycaps(currentCard);
+
+    } else {
+      questionLabelEl.textContent = "ひらがなをみて ローマ字を かんがえよう！";
+      mainPromptEl.textContent = currentCard.hira;
+
+      if (currentCard.alt) {
+        answerTextEl.textContent = `${currentCard.roma} [${currentCard.alt}]`;
+      } else {
+        answerTextEl.textContent = currentCard.roma;
+      }
+
+      keycapListEl.innerHTML = "";
+    }
+
+    subNoteEl.textContent = currentCard.note ? `💡 ${currentCard.note}` : "";
+
+    if (isPlaying && speedSeconds > 0) {
+      startTimer();
+    }
+  }
+
+  function renderKeycaps(card) {
+    keycapListEl.innerHTML = "";
+
+    card.roma.split("").forEach(char => {
+      const cap = document.createElement("div");
+      cap.className = "keycap";
+      cap.textContent = char.toUpperCase();
+      keycapListEl.appendChild(cap);
+    });
+
+    if (card.alt) {
+      const sep = document.createElement("div");
+      sep.style.cssText = "display:flex; align-items:center; font-weight:bold; color:#888; margin:0 4px;";
+      sep.textContent = "または";
+      keycapListEl.appendChild(sep);
+
+      card.alt.split("").forEach(char => {
+        const cap = document.createElement("div");
+        cap.className = "keycap keycap-alt";
+        cap.textContent = char.toUpperCase();
+        keycapListEl.appendChild(cap);
+      });
+    }
+  }
+
+  function startTimer() {
+    const totalMs = speedSeconds * 1000;
+    const intervalMs = 50;
+
+    timerInterval = setInterval(() => {
+      progressTime += intervalMs;
+      const percent = Math.min((progressTime / totalMs) * 100, 100);
+      timerBarEl.style.width = `${percent}%`;
+
+      if (progressTime >= totalMs) {
+        clearInterval(timerInterval);
+        showAnswer();
+      }
+    }, intervalMs);
+  }
+
+  function showAnswer() {
+    answerTextEl.classList.add("show");
+
+    if (soundEnabled && isRomaToHira) {
+      speakText(filteredList[currentIndex].hira);
+    }
+
+    if (isPlaying && speedSeconds > 0) {
+      setTimeout(() => {
+        if (isPlaying) {
+          nextSlide();
+        }
+      }, 1500);
+    }
+  }
+
+  function nextSlide() {
+    currentIndex = (currentIndex + 1) % filteredList.length;
+    loadSlide();
+  }
+
+  function prevSlide() {
+    currentIndex = (currentIndex - 1 + filteredList.length) % filteredList.length;
+    loadSlide();
+  }
+
+  function togglePlay() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      playBtnEl.textContent = "⏸️ いちじていし";
+      playBtnEl.classList.remove("paused");
+      loadSlide();
+    } else {
+      playBtnEl.textContent = "▶ さいせい";
+      playBtnEl.classList.add("paused");
+      clearInterval(timerInterval);
+    }
+  }
+
+  // スピード切り替え順番: 1秒 ➔ 2秒 ➔ 3秒 ➔ ていし ➔ 1秒 ...
+  function cycleSpeed() {
+    if (speedSeconds === 1) {
+      speedSeconds = 2;
+    } else if (speedSeconds === 2) {
+      speedSeconds = 3;
+    } else if (speedSeconds === 3) {
+      speedSeconds = 0; // 0秒 = ていし
+    } else {
+      speedSeconds = 1;
+    }
+
+    speedBtnEl.textContent = speedSeconds === 0 ? "⏱️ ていし" : `⏱️ ${speedSeconds}秒間隔`;
+    loadSlide();
+  }
+
+  function toggleMode() {
+    isRomaToHira = !isRomaToHira;
+    modeBtnEl.textContent = isRomaToHira ? "🔄 モード: ローマ字➔ひらがな" : "🔄 モード: ひらがな➔ローマ字";
+    loadSlide();
+  }
+
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    soundBtnEl.textContent = soundEnabled ? "🔊 おと: ON" : "🔇 おと: OFF";
+  }
+
+  function speakText(text) {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const uttr = new SpeechSynthesisUtterance(text);
+      uttr.lang = 'ja-JP';
+      uttr.rate = 0.9;
+      window.speechSynthesis.speak(uttr);
+    }
+  }
+
+  function openModal() {
+    const grid = document.getElementById("modalGrid");
+    grid.innerHTML = "";
+
+    filteredList.forEach((card, index) => {
+      const item = document.createElement("div");
+      item.className = "grid-item";
+      
+      let romaText = card.roma;
+      if (card.alt) romaText += ` [${card.alt}]`;
+
+      item.innerHTML = `
+        <div style="font-size:1.4rem; font-weight:bold; color:#E91E63;">${card.hira}</div>
+        <div style="font-size:1rem; font-weight:bold; color:#333;">${romaText}</div>
+      `;
+      item.onclick = () => {
+        currentIndex = index;
+        closeModal();
+        loadSlide();
+      };
+      grid.appendChild(item);
+    });
+
+    document.getElementById("listModal").style.display = "flex";
+  }
+
+  function closeModal() {
+    document.getElementById("listModal").style.display = "none";
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") nextSlide();
+    if (e.key === "ArrowLeft") prevSlide();
+    if (e.key === " ") {
+      e.preventDefault();
+      togglePlay();
+    }
+  });
+
+  window.onload = init;
+</script>
+</body>
+</html>
