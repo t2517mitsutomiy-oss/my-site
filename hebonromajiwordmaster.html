@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ヘボン式 ローマ字単語マスター（双方向・タイマー調整）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #fef3c7 50%, #fbcfe8 100%);
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        .slide-card {
+            display: none;
+            opacity: 0;
+            transform: scale(0.96);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+
+        .slide-card.active {
+            display: flex;
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Key cap style for lowercase */
+        .key-cap {
+            background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+            border: 2px solid #94a3b8;
+            border-bottom-width: 6px;
+            border-radius: 12px;
+            box-shadow: 0 6px 0 #64748b, 0 8px 14px rgba(0, 0, 0, 0.12);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #1e293b;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+            transition: all 0.15s ease;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+
+        .key-cap.vowel {
+            background: linear-gradient(180deg, #fef08a 0%, #fde047 100%);
+            border-color: #ca8a04;
+            box-shadow: 0 6px 0 #a16207, 0 8px 14px rgba(234, 179, 8, 0.25);
+            color: #713f12;
+        }
+
+        .key-cap.consonant {
+            background: linear-gradient(180deg, #bfdbfe 0%, #93c5fd 100%);
+            border-color: #2563eb;
+            box-shadow: 0 6px 0 #1d4ed8, 0 8px 14px rgba(59, 130, 246, 0.25);
+            color: #1e3a8a;
+        }
+
+        /* Pop in animation */
+        @keyframes popIn {
+            0% { transform: scale(0.4) rotate(-5deg); opacity: 0; }
+            70% { transform: scale(1.1) rotate(2deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .pop-in {
+            animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Pulse glow animation */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+            50% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+        }
+
+        .pulse-btn {
+            animation: pulseGlow 2s infinite;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between p-3 sm:p-6 min-h-screen">
+
+    <!-- Navigation & Settings Header -->
+    <header class="w-full max-w-5xl bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border-2 border-white flex flex-col gap-3 mb-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-2xl shadow-md">
+                    <i class="fa-solid fa-spell-check"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-black text-slate-800 leading-tight flex items-center gap-2">
+                        ヘボン式 ローマ字単語マスター
+                    </h1>
+                    <p class="text-xs text-slate-500 font-bold">じどうで「もんだい ➔ こたえ」が切り替わるよ！</p>
+                </div>
+            </div>
+
+            <!-- Settings Controls: Speed & Mode -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3 bg-slate-100 p-2 rounded-2xl border border-slate-200">
+                <!-- Conversion Direction Selector -->
+                <div class="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-xl border border-slate-300 shadow-sm text-xs font-black text-slate-700">
+                    <i class="fa-solid fa-arrow-right-arrow-left text-indigo-500"></i>
+                    <select id="modeSelect" onchange="changeMode(this.value)" class="bg-transparent focus:outline-none font-bold text-slate-800 cursor-pointer">
+                        <option value="hiraToRoma">ひらがな ➔ ローマ字</option>
+                        <option value="romaToHira">ローマ字 ➔ ひらがな</option>
+                    </select>
+                </div>
+
+                <!-- Speed Selector (1s to 5s) -->
+                <div class="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-xl border border-slate-300 shadow-sm text-xs font-black text-slate-700">
+                    <i class="fa-solid fa-clock text-amber-500"></i>
+                    <span>タイマー:</span>
+                    <select id="speedSelect" onchange="changeSpeed(this.value)" class="bg-transparent focus:outline-none font-bold text-indigo-600 cursor-pointer">
+                        <option value="1000">1秒</option>
+                        <option value="2000">2秒</option>
+                        <option value="3000" selected>3秒</option>
+                        <option value="4000">4秒</option>
+                        <option value="5000">5秒</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Playback Controls -->
+            <div class="flex items-center gap-2 sm:gap-3 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                <button id="btnPrev" onclick="prevSlide()" class="w-10 h-10 rounded-lg bg-white text-slate-700 hover:bg-slate-200 flex items-center justify-center font-bold shadow-sm transition active:scale-95" title="まえへ">
+                    <i class="fa-solid fa-chevron-left text-lg"></i>
+                </button>
+                <button id="btnPlayPause" onclick="togglePlayPause()" class="px-4 h-10 rounded-lg bg-emerald-500 text-white font-black flex items-center gap-2 shadow-md hover:bg-emerald-600 transition pulse-btn active:scale-95">
+                    <i id="playIcon" class="fa-solid fa-pause"></i>
+                    <span id="playText" class="text-sm">一時停止</span>
+                </button>
+                <button id="btnNext" onclick="nextSlide()" class="w-10 h-10 rounded-lg bg-white text-slate-700 hover:bg-slate-200 flex items-center justify-center font-bold shadow-sm transition active:scale-95" title="つぎへ">
+                    <i class="fa-solid fa-chevron-right text-lg"></i>
+                </button>
+                <button onclick="resetSlides()" class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 flex items-center justify-center font-bold transition active:scale-95" title="さいしょから">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="toggleGridModal()" class="px-3 h-10 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition active:scale-95" title="一覧">
+                    <i class="fa-solid fa-th-large"></i>
+                    <span class="hidden sm:inline">一覧</span>
+                </button>
+            </div>
+
+            <!-- Slide Counter -->
+            <div class="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                <span class="text-xs font-bold text-indigo-400">スライド</span>
+                <span id="slideCounter" class="text-base font-black text-indigo-600">1 / 1</span>
+            </div>
+        </div>
+
+        <!-- Category Filters -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-bold scrollbar-none">
+            <span class="text-slate-400 shrink-0 mr-1"><i class="fa-solid fa-filter"></i> ジャンル:</span>
+            <button onclick="filterCategory('all')" id="cat-all" class="cat-btn bg-indigo-600 text-white px-3 py-1.5 rounded-lg shadow-sm transition shrink-0">すべて</button>
+            <button onclick="filterCategory('food')" id="cat-food" class="cat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition shrink-0">たべもの・いきもの</button>
+            <button onclick="filterCategory('town')" id="cat-town" class="cat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition shrink-0">のりもの・まち</button>
+            <button onclick="filterCategory('life')" id="cat-life" class="cat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition shrink-0">がっこう・かぞく</button>
+            <button onclick="filterCategory('hepburn_special')" id="cat-hepburn_special" class="cat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition shrink-0">ヘボン式とくしゅう (sh, ch, ts, f, j)</button>
+            <button onclick="filterCategory('rules')" id="cat-rules" class="cat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition shrink-0">長音バー(ā ī ū ē ō)・っ・んルール</button>
+        </div>
+    </header>
+
+    <!-- Timer Progress Gauge Container -->
+    <div class="w-full max-w-5xl bg-slate-200/80 rounded-full h-3.5 mb-3 overflow-hidden border border-white shadow-inner relative flex items-center">
+        <div id="timerBar" class="bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-500 h-full w-0 transition-all duration-100 ease-linear"></div>
+    </div>
+
+    <!-- Main Presentation Canvas Container -->
+    <main id="slideContainer" class="w-full max-w-5xl flex-1 flex items-center justify-center relative my-auto min-h-[440px]">
+        <!-- Dynamic Slide Cards generated by JS -->
+    </main>
+
+    <!-- Slide Navigation Grid Modal -->
+    <div id="gridModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-3xl max-h-[85vh] rounded-3xl p-6 flex flex-col shadow-2xl border-4 border-indigo-200">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-200 mb-4">
+                <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-th-large text-indigo-500"></i> ヘボン式 単語いちらん
+                </h2>
+                <button onclick="toggleGridModal()" class="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="gridItemsList" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto p-1 flex-1">
+                <!-- Grid items generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Help -->
+    <footer class="w-full max-w-5xl text-center mt-3 text-slate-500 text-xs font-bold flex flex-wrap justify-between items-center gap-2 px-2">
+        <div>
+            <i class="fa-solid fa-keyboard mr-1"></i> <kbd class="bg-white px-2 py-0.5 rounded shadow-sm border border-slate-300">←</kbd> <kbd class="bg-white px-2 py-0.5 rounded shadow-sm border border-slate-300">→</kbd> キーで 手どう操作
+        </div>
+        <div>
+            <i class="fa-regular fa-clock mr-1"></i> タイマー選択: <span id="currentSpeedText" class="font-extrabold text-indigo-600">3秒</span> 間隔
+        </div>
+        <div>
+            <kbd class="bg-white px-2 py-0.5 rounded shadow-sm border border-slate-300">Space</kbd> キーで 一時停止 / さいせい
+        </div>
+    </footer>
+
+    <script>
+        // Comprehensive Dataset of 100 Words for Hepburn Romaji Practice (with Macrons ā, ī, ū, ē, ō)
+        const RAW_WORDS_DATA = [
+            // --- 1. たべもの・いきもの (20語) ---
+            { category: 'food', word: 'すし', icon: '🍣', hepburn: 'sushi', keys: ['s','u','s','h','i'], note: '「し」は si ではなく【shi】と書くのがヘボン式！' },
+            { category: 'food', word: 'ラーメン', icon: '🍜', hepburn: 'rāmen', keys: ['r','ā','m','e','n'], note: '「らー」の伸ばす音（長音）は【ā】のようにバーを載せるよ！' },
+            { category: 'food', word: 'ケーキ', icon: '🍰', hepburn: 'kēki', keys: ['k','ē','k','i'], note: '「けー」の長音は e の上にバーをつけて【ē】と書くよ！' },
+            { category: 'food', word: 'スープ', icon: '🍲', hepburn: 'sūpu', keys: ['s','ū','p','u'], note: '「すー」の長音は u の上にバーをつけて【ū】と書くよ！' },
+            { category: 'food', word: 'てんぷら', icon: '🍤', hepburn: 'tempura', keys: ['t','e','m','p','u','r','a'], note: '「ん」のうしろが p（ば行・ぱ行・ま行）のときは n ではなく【m】になるよ！' },
+            { category: 'food', word: 'おちゃ', icon: '🍵', hepburn: 'ocha', keys: ['o','c','h','a'], note: '「ちゃ」は tya ではなく【cha】と書くのがヘボン式！' },
+            { category: 'food', word: 'とうふ', icon: '🧊', hepburn: 'tōfu', keys: ['t','ō','f','u'], note: '「ふ」は【fu】！「とう」の長音は o の上にバーをつけて【ō】！' },
+            { category: 'food', word: 'ハンバーガー', icon: '🍔', hepburn: 'hambāgā', keys: ['h','a','m','b','ā','g','ā'], note: 'b の前の「ん」は【m】！ふたつの「ー」は長音バー【ā】をつけるよ！' },
+            { category: 'food', word: 'ぶどう', icon: '🍇', hepburn: 'budō', keys: ['b','u','d','ō'], note: '「どう」の伸ばす音（う）は o の上にバーをつけて【ō】！' },
+            { category: 'food', word: 'ライオン', icon: '🦁', hepburn: 'raion', keys: ['r','a','i','o','n'], note: '文末の「ん」は【n】で書くよ！' },
+            { category: 'food', word: 'ぞう', icon: '🐘', hepburn: 'zō', keys: ['z','ō'], note: '「ぞう」の伸ばす音は o の上にバーをつけて【zō】！' },
+            { category: 'food', word: 'チョコ', icon: '🍫', hepburn: 'choko', keys: ['c','h','o','k','o'], note: '「ちょ」は【cho】と書くよ！' },
+            { category: 'food', word: 'いちご', icon: '🍓', hepburn: 'ichigo', keys: ['i','c','h','i','g','o'], note: '「ち」は ti ではなく【chi】と書くよ！' },
+            { category: 'food', word: 'りんご', icon: '🍎', hepburn: 'ringo', keys: ['r','i','n','g','o'], note: '「ん」のうしろが g のときは【n】のままでOK！' },
+            { category: 'food', word: 'さかな', icon: '🐟', hepburn: 'sakana', keys: ['s','a','k','a','n','a'], note: '「s」「a」「k」「a」「n」「a」でさかな！' },
+            { category: 'food', word: 'きつね', icon: '🦊', hepburn: 'kitsune', keys: ['k','i','t','s','u','n','e'], note: '「つ」は tu ではなく【tsu】と書くのがヘボン式！' },
+            { category: 'food', word: 'ふくろう', icon: '🦉', hepburn: 'fukurō', keys: ['f','u','k','u','r','ō'], note: '「ふ」は【fu】！「ろう」の長音は【rō】！' },
+            { category: 'food', word: 'パフェ', icon: '🍨', hepburn: 'pafe', keys: ['p','a','f','e'], note: '「ふぇ」の音は【fe】と書くよ！' },
+            { category: 'food', word: 'ぎゅうにゅう', icon: '🥛', hepburn: 'gyūnyū', keys: ['g','y','ū','n','y','ū'], note: '「ぎゅう」「にゅう」の長音（伸ばす音）は両方【ū】にするよ！' },
+            { category: 'food', word: 'さんま', icon: '🐟', hepburn: 'samma', keys: ['s','a','m','m','a'], note: 'm（ま行）の直前にある「ん」は n ではなく【m】になるよ！' },
+
+            // --- 2. のりもの・まち (20語) ---
+            { category: 'town', word: 'しんかんせん', icon: '🚅', hepburn: 'shinkansen', keys: ['s','h','i','n','k','a','n','s','e','n'], note: '「し」は【shi】！「ん」のうしろが k や s なので普通に【n】！' },
+            { category: 'town', word: 'ひこうき', icon: '✈️', hepburn: 'hikōki', keys: ['h','i','k','ō','k','i'], note: '「こう」の伸ばす音は o の上にバーをつけて【ō】！' },
+            { category: 'town', word: 'タクシー', icon: '🚕', hepburn: 'takushī', keys: ['t','a','k','u','s','h','ī'], note: '「し」は【shi】！最後の長音「ー」は i の上にバーをつけて【ī】！' },
+            { category: 'town', word: 'ふじさん', icon: '🗻', hepburn: 'fujisan', keys: ['f','u','j','i','s','a','n'], note: '「ふ」は【fu】、「じ」は zi ではなく【ji】と書くよ！' },
+            { category: 'town', word: 'ちけっと', icon: '🎟️', hepburn: 'chiketto', keys: ['c','h','i','k','e','t','t','o'], note: '「ち」は【chi】！「っ」はつぎの文字「t」を2回重ねるよ！' },
+            { category: 'town', word: 'ゆうえんち', icon: '🎡', hepburn: 'yūenchi', keys: ['y','ū','e','n','c','h','i'], note: '「ゆう」の長音は【ū】！「ち」は【chi】！' },
+            { category: 'town', word: 'ちゅうしゃじょう', icon: '🅿️', hepburn: 'chūshajō', keys: ['c','h','ū','s','h','a','j','ō'], note: '「ちゅう」は【chū】、「しゃ」は【sha】、「じょう」は【jō】！' },
+            { category: 'town', word: 'デパート', icon: '🏬', hepburn: 'depāto', keys: ['d','e','p','ā','t','o'], note: '「ぱー」の伸ばす音（長音）は a にバーをつけて【ā】！' },
+            { category: 'town', word: 'えき', icon: '🚉', hepburn: 'eki', keys: ['e','k','i'], note: '「e」と「k」「i」で「えき」！' },
+            { category: 'town', word: 'こうえん', icon: '🛝', hepburn: 'kōen', keys: ['k','ō','e','n'], note: '「こう」の長音（伸ばす音）は【kō】にするよ！' },
+            { category: 'town', word: 'びょういん', icon: '🏥', hepburn: 'byōin', keys: ['b','y','ō','i','n'], note: '「びょう」は【byō】と書くよ！' },
+            { category: 'town', word: 'じどうしゃ', icon: '🚗', hepburn: 'jidōsha', keys: ['j','i','d','ō','s','h','a'], note: '「じ」は【ji】、「どう」は【dō】、「しゃ」は【sha】！' },
+            { category: 'town', word: 'バス', icon: '🚌', hepburn: 'basu', keys: ['b','a','s','u'], note: '「b」「a」「s」「u」でバス！' },
+            { category: 'town', word: 'としょかん', icon: '📚', hepburn: 'toshokan', keys: ['t','o','s','h','o','k','a','n'], note: '「しょ」は syo ではなく【sho】と書くのがヘボン式！' },
+            { category: 'town', word: 'ひろしま', icon: '🍁', hepburn: 'hiroshima', keys: ['h','i','r','o','s','h','i','m','a'], note: '「しま」の「し」は【shi】！' },
+            { category: 'town', word: 'きょうと', icon: '⛩️', hepburn: 'kyōto', keys: ['k','y','ō','t','o'], note: '「きょう」の長音は o にバーをつけて【kyō】！' },
+            { category: 'town', word: 'おおさか', icon: '🏯', hepburn: 'ōsaka', keys: ['ō','s','a','k','a'], note: '「おお」の同じ母音が続く長音もバーをつけて【ō】！' },
+            { category: 'town', word: 'くうこう', icon: '✈️', hepburn: 'kūkō', keys: ['k','ū','k','ō'], note: '「くう」の長音は【kū】、「こう」の長音は【kō】！' },
+            { category: 'town', word: 'はし', icon: '🌉', hepburn: 'hashi', keys: ['h','a','s','h','i'], note: '「し」は【shi】！' },
+            { category: 'town', word: 'じんじゃ', icon: '⛩️', hepburn: 'jinja', keys: ['j','i','n','j','a'], note: '「じ」は【ji】、「じゃ」は【ja】！' },
+
+            // --- 3. がっこう・かぞく (20語) ---
+            { category: 'life', word: 'がっこう', icon: '🏫', hepburn: 'gakkō', keys: ['g','a','k','k','ō'], note: '「っ」は k を2回重ねて【kk】！「こう」の長音は【ō】！' },
+            { category: 'life', word: 'きょうしつ', icon: '🏫', hepburn: 'kyōshitsu', keys: ['k','y','ō','s','h','i','t','s','u'], note: '「きょう」は【kyō】、「し」は【shi】、「つ」は【tsu】！' },
+            { category: 'life', word: 'ノート', icon: '📓', hepburn: 'nōto', keys: ['n','ō','t','o'], note: '「のー」の長音は o の上にバーをつけて【nōto】！' },
+            { category: 'life', word: 'おかあさん', icon: '👩', hepburn: 'okāsan', keys: ['o','k','ā','s','a','n'], note: '「かあ」の長音（伸ばす音）は a にバーをつけて【ā】！' },
+            { category: 'life', word: 'おとうさん', icon: '👨', hepburn: 'otōsan', keys: ['o','t','ō','s','a','n'], note: '「とう」の長音は o にバーをつけて【ō】！' },
+            { category: 'life', word: 'おにいさん', icon: '👦', hepburn: 'onīsan', keys: ['o','n','ī','s','a','n'], note: '「にい」の長音は i にバーをつけて【ī】！' },
+            { category: 'life', word: 'おねえさん', icon: '👧', hepburn: 'onēsan', keys: ['o','n','ē','s','a','n'], note: '「ねえ」の長音は e にバーをつけて【ē】！' },
+            { category: 'life', word: 'おじいさん', icon: '👴', hepburn: 'ojīsan', keys: ['o','j','ī','s','a','n'], note: '「じ」は【ji】！「じい」の長音は i にバーをつけて【ī】！' },
+            { category: 'life', word: 'おばあさん', icon: '👵', hepburn: 'obāsan', keys: ['o','b','ā','s','a','n'], note: '「ばあ」の長音は a にバーをつけて【ā】！' },
+            { category: 'life', word: 'えんぴつ', icon: '✏️', hepburn: 'empitsu', keys: ['e','m','p','i','t','s','u'], note: 'p（ぱ行）の直前にある「ん」は【m】！「つ」は【tsu】！' },
+            { category: 'life', word: 'けしごむ', icon: '🧹', hepburn: 'keshigomu', keys: ['k','e','s','h','i','g','o','m','u'], note: '「し」は【shi】！' },
+            { category: 'life', word: 'つくえ', icon: '🪑', hepburn: 'tsukue', keys: ['t','s','u','k','u','e'], note: '「つ」は【tsu】！' },
+            { category: 'life', word: 'いす', icon: '🪑', hepburn: 'isu', keys: ['i','s','u'], note: '「i」と「s」「u」で「いす」！' },
+            { category: 'life', word: 'とけい', icon: '⏰', hepburn: 'tokei', keys: ['t','o','k','e','i'], note: '「t」「o」「k」「e」「i」でとけい！' },
+            { category: 'life', word: 'ふでばこ', icon: '👝', hepburn: 'fudebako', keys: ['f','u','d','e','b','a','k','o'], note: '「ふ」は hu ではなく【fu】！' },
+            { category: 'life', word: 'ぼうし', icon: '🧢', hepburn: 'bōshi', keys: ['b','ō','s','h','i'], note: '「ぼう」の長音は【bō】、「し」は【shi】！' },
+            { category: 'life', word: 'くつ', icon: '👟', hepburn: 'kutsu', keys: ['k','u','t','s','u'], note: '「つ」は【tsu】！' },
+            { category: 'life', word: 'しゅくだい', icon: '📝', hepburn: 'shukudai', keys: ['s','h','u','k','u','d','a','i'], note: '「しゅ」は【shu】！' },
+            { category: 'life', word: 'そうじ', icon: '🧹', hepburn: 'sōji', keys: ['s','ō','j','i'], note: '「そう」の長音は【sō】、「じ」は【ji】！' },
+            { category: 'life', word: 'たんじょうび', icon: '🎂', hepburn: 'tanjōbi', keys: ['t','a','n','j','ō','b','i'], note: '「じょう」の長音は【jō】！' },
+
+            // --- 4. ヘボン式とくしゅう (sh, ch, ts, f, j) (20語) ---
+            { category: 'hepburn_special', word: 'しゃしん', icon: '📷', hepburn: 'shashin', keys: ['s','h','a','s','h','i','n'], note: '「しゃ」は【sha】、「し」は【shi】！ヘボン式の代表選手！' },
+            { category: 'hepburn_special', word: 'まつり', icon: '🎆', hepburn: 'matsuri', keys: ['m','a','t','s','u','r','i'], note: '「つ」は tu ではなく【tsu】と書くのがヘボン式！' },
+            { category: 'hepburn_special', word: 'チョコレート', icon: '🍫', hepburn: 'chokorēto', keys: ['c','h','o','k','o','r','ē','t','o'], note: '「ちょ」は【cho】！「れー」の長音は e の上にバーをつけて【ē】！' },
+            { category: 'hepburn_special', word: 'にんじゃ', icon: '🥷', hepburn: 'ninja', keys: ['n','i','n','j','a'], note: '「じゅ・じょ・じゃ」は j を使って【ja/ju/jo】！' },
+            { category: 'hepburn_special', word: 'ちきゅう', icon: '🌍', hepburn: 'chikyū', keys: ['c','h','i','k','y','ū'], note: '「ち」は【chi】！最後の「きゅう」の長音は【ū】にするよ！' },
+            { category: 'hepburn_special', word: 'ふうせん', icon: '🎈', hepburn: 'fūsen', keys: ['f','ū','s','e','n'], note: '「ふ」は hu ではなく【fu】！「ふう」の長音は【fū】！' },
+            { category: 'hepburn_special', word: 'しゅうじ', icon: '🖌️', hepburn: 'shūji', keys: ['s','h','ū','j','i'], note: '「しゅう」は【shū】、「じ」は【ji】！' },
+            { category: 'hepburn_special', word: 'ちゅうしゃ', icon: '💉', hepburn: 'chūsha', keys: ['c','h','ū','s','h','a'], note: '「ちゅう」は【chū】、「しゃ」は【sha】！' },
+            { category: 'hepburn_special', word: 'つなみ', icon: '🌊', hepburn: 'tsunami', keys: ['t','s','u','n','a','m','i'], note: '「つ」は【tsu】！世界で通じる言葉だよ！' },
+            { category: 'hepburn_special', word: 'じゅうどう', icon: '🥋', hepburn: 'jūdō', keys: ['j','ū','d','ō'], note: '「じゅう」は【jū】、「どう」は【dō】！' },
+            { category: 'hepburn_special', word: 'しょうぎ', icon: '🤹', hepburn: 'shōgi', keys: ['s','h','ō','g','i'], note: '「しょう」は【shō】！' },
+            { category: 'hepburn_special', word: 'にんじゅつ', icon: '🥷', hepburn: 'ninjutsu', keys: ['n','i','n','j','u','t','s','u'], note: '「じゅ」は【ju】、「つ」は【tsu】！' },
+            { category: 'hepburn_special', word: 'おもちゃ', icon: '🧸', hepburn: 'omocha', keys: ['o','m','o','c','h','a'], note: '「ちゃ」は【cha】！' },
+            { category: 'hepburn_special', word: 'ちょうちょ', icon: '🦋', hepburn: 'chōcho', keys: ['c','h','ō','c','h','o'], note: '「ちょう」は【chō】、「ちょ」は【cho】！' },
+            { category: 'hepburn_special', word: 'きんぎょ', icon: '🐠', hepburn: 'kingyo', keys: ['k','i','n','g','y','o'], note: '「ぎょ」は【gyo】！' },
+            { category: 'hepburn_special', word: 'じょうろ', icon: '🪴', hepburn: 'jōro', keys: ['j','ō','r','o'], note: '「じょう」は【jō】！' },
+            { category: 'hepburn_special', word: 'ちりとり', icon: '🧹', hepburn: 'chiritori', keys: ['c','h','i','r','i','t','o','r','i'], note: '「ち」は【chi】！' },
+            { category: 'hepburn_special', word: 'つばめ', icon: '🐦', hepburn: 'tsubame', keys: ['t','s','u','b','a','m','e'], note: '「つ」は【tsu】！' },
+            { category: 'hepburn_special', word: 'ふじ', icon: '🗻', hepburn: 'fuji', keys: ['f','u','j','i'], note: '「ふ」は【fu】、「じ」は【ji】！' },
+            { category: 'hepburn_special', word: 'じょうほう', icon: '💻', hepburn: 'jōhō', keys: ['j','ō','h','ō'], note: '「じょう」は【jō】、「ほう」は【hō】！' },
+
+            // --- 5. 長音バー(ā ī ū ē ō)・っ・んルール (20語) ---
+            { category: 'rules', word: 'とうきょう', icon: '🗼', hepburn: 'tōkyō', keys: ['t','ō','k','y','ō'], note: '「とう」「きょう」の長音（伸ばす音）は o の上にバーをつけて【tōkyō】！' },
+            { category: 'rules', word: 'おおかみ', icon: '🐺', hepburn: 'ōkami', keys: ['ō','k','a','m','i'], note: '「おお」の長音（同じ母音が続く音）もバーをつけて【ōkami】と表すよ！' },
+            { category: 'rules', word: 'きっぷ', icon: '🎫', hepburn: 'kippu', keys: ['k','i','p','p','u'], note: '小さい「っ」は、うしろの「p」をふたつ重ねて【ppu】！' },
+            { category: 'rules', word: 'ざっし', icon: '📚', hepburn: 'zasshi', keys: ['z','a','s','s','h','i'], note: '「っ」のうしろが shi のときは【ssh】と書くよ！' },
+            { category: 'rules', word: 'まっちゃ', icon: '🍵', hepburn: 'matcha', keys: ['m','a','t','c','h','a'], note: '【重要】「っ」のうしろが cha/chi/chu/cho のときは【t】をつけるよ！（tcha）' },
+            { category: 'rules', word: 'しんぶん', icon: '📰', hepburn: 'shimbun', keys: ['s','h','i','m','b','u','n'], note: 'b の前の「ん」は n ではなく【m】にするのがヘボン式規則！' },
+            { category: 'rules', word: 'かんぱい', icon: '🍻', hepburn: 'kampai', keys: ['k','a','m','p','a','i'], note: 'p（ぱ行）の前の「ん」は n ではなく【m】と書くよ！' },
+            { category: 'rules', word: 'さんぽ', icon: '🚶', hepburn: 'sampo', keys: ['s','a','m','p','o'], note: 'p の前の「ん」は【m】になるよ！' },
+            { category: 'rules', word: 'にっぽん', icon: '🇯🇵', hepburn: 'nippon', keys: ['n','i','p','p','o','n'], note: '「っ」は p を重ねて【pp】！' },
+            { category: 'rules', word: 'ぼっち', icon: '🪑', hepburn: 'botchi', keys: ['b','o','t','c','h','i'], note: 'chi の前の「っ」は t を使って【tchi】と表すよ！' },
+            { category: 'rules', word: 'こうちょう', icon: '🏫', hepburn: 'kōchō', keys: ['k','ō','c','h','ō'], note: '「こう」は【kō】、「ちょう」は【chō】！' },
+            { category: 'rules', word: 'ほっかいどう', icon: '🗾', hepburn: 'hokkaidō', keys: ['h','o','k','k','a','i','d','ō'], note: '「っ」は【kk】、「どう」は【dō】！' },
+            { category: 'rules', word: 'じゅうじろう', icon: '⛩️', hepburn: 'jūjirō', keys: ['j','ū','j','i','r','ō'], note: '「じゅう」は【jū】、「ろう」は【rō】！' },
+            { category: 'rules', word: 'おおきい', icon: '🐘', hepburn: 'ōkii', keys: ['ō','k','i','i'], note: '「おお」の長音はバーをつけて【ō】！' },
+            { category: 'rules', word: 'とおり', icon: '🛣️', hepburn: 'tōri', keys: ['t','ō','r','i'], note: '「とお」の長音も o にバーをつけて【tō】！' },
+            { category: 'rules', word: 'こおり', icon: '🧊', hepburn: 'kōri', keys: ['k','ō','r','i'], note: '「こお」の長音も【kō】！' },
+            { category: 'rules', word: 'じょうしょう', icon: '📈', hepburn: 'jōshō', keys: ['j','ō','s','h','ō'], note: '「じょう」は【jō】、「しょう」は【shō】！' },
+            { category: 'rules', word: 'ほうそう', icon: '📻', hepburn: 'hōsō', keys: ['h','ō','s','ō'], note: '「ほう」は【hō】、「そう」は【sō】！' },
+            { category: 'rules', word: 'がっしょう', icon: '🎶', hepburn: 'gasshō', keys: ['g','a','s','s','h','ō'], note: '「っ」のうしろが sh なので【ssh】！「しょう」は【shō】！' },
+            { category: 'rules', word: 'しんぱい', icon: '😟', hepburn: 'shimpai', keys: ['s','h','i','m','p','a','i'], note: '「し」は【shi】！p の直前の「ん」は【m】！' }
+        ];
+
+        // Application state
+        let activeSlides = [];
+        let currentSlideIndex = 0;
+        let isPlaying = true;
+        let slideStartTime = null;
+        let animationFrameId = null;
+        let DURATION_PER_SLIDE = 3000; // Default: 3 seconds
+        let currentMode = 'hiraToRoma'; // 'hiraToRoma' or 'romaToHira'
+        let currentCategory = 'all';
+
+        // Category UI Config
+        const CATEGORY_THEMES = {
+            food: { border: 'border-amber-400', badgeBg: 'bg-amber-100', badgeText: 'text-amber-800', accentText: 'text-amber-500', noteBg: 'bg-amber-50', noteBorder: 'border-amber-200', noteText: 'text-amber-900', label: 'たべもの・いきもの' },
+            town: { border: 'border-emerald-400', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-800', accentText: 'text-emerald-600', noteBg: 'bg-emerald-50', noteBorder: 'border-emerald-200', noteText: 'text-emerald-900', label: 'のりもの・まち' },
+            life: { border: 'border-rose-400', badgeBg: 'bg-rose-100', badgeText: 'text-rose-800', accentText: 'text-rose-600', noteBg: 'bg-rose-50', noteBorder: 'border-rose-200', noteText: 'text-rose-900', label: 'がっこう・かぞく' },
+            hepburn_special: { border: 'border-sky-400', badgeBg: 'bg-sky-100', badgeText: 'text-sky-800', accentText: 'text-sky-600', noteBg: 'bg-sky-50', noteBorder: 'border-sky-200', noteText: 'text-sky-900', label: 'ヘボン式とくしゅう' },
+            rules: { border: 'border-purple-400', badgeBg: 'bg-purple-100', badgeText: 'text-purple-800', accentText: 'text-purple-600', noteBg: 'bg-purple-50', noteBorder: 'border-purple-200', noteText: 'text-purple-900', label: '長音バー・ルール' }
+        };
+
+        function buildSlidesData(category = 'all', mode = 'hiraToRoma') {
+            const pairedSlides = [];
+            let filteredItems = RAW_WORDS_DATA;
+            if (category !== 'all') {
+                filteredItems = RAW_WORDS_DATA.filter(item => item.category === category);
+            }
+
+            filteredItems.forEach((item) => {
+                const theme = CATEGORY_THEMES[item.category] || CATEGORY_THEMES.food;
+
+                // 1. Question Slide
+                pairedSlides.push({
+                    type: 'question',
+                    mode: mode,
+                    word: item.word,
+                    icon: item.icon,
+                    hepburn: item.hepburn,
+                    keys: item.keys,
+                    note: item.note,
+                    category: item.category,
+                    theme: theme
+                });
+
+                // 2. Answer Slide
+                pairedSlides.push({
+                    type: 'answer',
+                    mode: mode,
+                    word: item.word,
+                    icon: item.icon,
+                    hepburn: item.hepburn,
+                    keys: item.keys,
+                    note: item.note,
+                    category: item.category,
+                    theme: theme
+                });
+            });
+
+            return pairedSlides;
+        }
+
+        function renderSlides() {
+            slideContainer.innerHTML = '';
+            const secText = Math.round(DURATION_PER_SLIDE / 1000);
+
+            activeSlides.forEach((slide, index) => {
+                const slideEl = document.createElement('div');
+                slideEl.id = `slide-${index}`;
+                slideEl.className = `slide-card w-full flex-col items-center justify-between bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-4 ${slide.theme.border} min-h-[440px]`;
+
+                const keyCapsHtml = slide.keys.map(k => {
+                    const isVowel = ['a','i','u','e','o','ā','ī','ū','ē','ō'].includes(k.toLowerCase());
+                    const keyClass = isVowel ? 'vowel' : 'consonant';
+                    return `<div class="key-cap ${keyClass} text-xl sm:text-3xl w-10 h-14 sm:w-14 sm:h-18 min-w-[2.5rem]">${k}</div>`;
+                }).join('');
+
+                if (slide.mode === 'hiraToRoma') {
+                    // === HIRAGANA -> ROMAJI ===
+                    if (slide.type === 'question') {
+                        slideEl.innerHTML = `
+                            <div class="w-full flex items-center justify-between border-b-2 border-slate-100 pb-3 mb-2">
+                                <span class="${slide.theme.badgeBg} ${slide.theme.badgeText} text-xs sm:text-sm font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-question"></i> ${slide.theme.label} [ひらがな ➔ ローマ字]
+                                </span>
+                                <span class="text-xs sm:text-sm font-bold text-slate-400 flex items-center gap-1">
+                                    <i class="fa-regular fa-clock"></i> ${secText}秒後に こたえ表示
+                                </span>
+                            </div>
+
+                            <div class="text-center my-auto flex flex-col items-center w-full">
+                                <span class="text-5xl sm:text-7xl mb-2 drop-shadow-sm">${slide.icon}</span>
+                                <p class="text-slate-500 text-sm sm:text-base font-bold mb-1">この言葉を ヘボン式ローマ字（小文字）で書くと？</p>
+                                <div class="text-5xl sm:text-7xl font-black text-slate-800 tracking-wider mb-4 drop-shadow-sm">
+                                    ${slide.word}
+                                </div>
+                                <div class="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl px-6 py-2.5 text-indigo-700 font-extrabold text-xs sm:text-sm flex items-center gap-2">
+                                    <i class="fa-solid fa-brain text-indigo-500 text-base"></i>
+                                    頭の中でヘボン式（のばす音のバー ā ī ū ē ō）を思い浮かべよう！
+                                </div>
+                            </div>
+
+                            <div class="w-full ${slide.theme.noteBg} rounded-2xl p-3 border ${slide.theme.noteBorder} mt-3 text-center">
+                                <p class="text-xs sm:text-sm ${slide.theme.noteText} font-bold">
+                                    <i class="fa-solid fa-lightbulb ${slide.theme.accentText} mr-1"></i> ヒント: のばす音（長音）には文字の上にバー（ā, ī, ū, ē, ō）が付くよ！
+                                </p>
+                            </div>
+                        `;
+                    } else {
+                        // Answer
+                        slideEl.innerHTML = `
+                            <div class="w-full flex items-center justify-between border-b-2 border-slate-100 pb-3 mb-2">
+                                <span class="bg-emerald-100 text-emerald-800 text-xs sm:text-sm font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-check"></i> こたえ！(ヘボン式)
+                                </span>
+                                <span class="text-xs sm:text-sm font-bold text-slate-400">
+                                    ${secText}秒後に つぎへ
+                                </span>
+                            </div>
+
+                            <div class="text-center my-auto flex flex-col items-center w-full">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-3xl">${slide.icon}</span>
+                                    <span class="text-2xl sm:text-3xl font-black text-slate-700">${slide.word}</span>
+                                </div>
+
+                                <div class="pop-in text-5xl sm:text-7xl font-black text-emerald-600 tracking-wider my-2 drop-shadow-md">
+                                    ${slide.hepburn}
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-center gap-1 sm:gap-2 my-2 max-w-full">
+                                    ${keyCapsHtml}
+                                </div>
+                            </div>
+
+                            <div class="w-full ${slide.theme.noteBg} rounded-2xl p-3 border ${slide.theme.noteBorder} mt-3 text-center">
+                                <p class="text-xs sm:text-sm ${slide.theme.noteText} font-black">
+                                    <i class="fa-solid fa-star ${slide.theme.accentText} mr-1"></i> ヘボン式のポイント: ${slide.note}
+                                </p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // === ROMAJI -> HIRAGANA (REVERSE) ===
+                    if (slide.type === 'question') {
+                        slideEl.innerHTML = `
+                            <div class="w-full flex items-center justify-between border-b-2 border-slate-100 pb-3 mb-2">
+                                <span class="${slide.theme.badgeBg} ${slide.theme.badgeText} text-xs sm:text-sm font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-question"></i> ${slide.theme.label} [ローマ字 ➔ ひらがな]
+                                </span>
+                                <span class="text-xs sm:text-sm font-bold text-slate-400 flex items-center gap-1">
+                                    <i class="fa-regular fa-clock"></i> ${secText}秒後に こたえ表示
+                                </span>
+                            </div>
+
+                            <div class="text-center my-auto flex flex-col items-center w-full">
+                                <p class="text-slate-500 text-sm sm:text-base font-bold mb-1">このローマ字を 日本語（ひらがな）にすると？</p>
+                                <div class="text-5xl sm:text-7xl font-black text-indigo-600 tracking-wider my-2 drop-shadow-sm">
+                                    ${slide.hepburn}
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-center gap-1 sm:gap-2 my-2 max-w-full">
+                                    ${keyCapsHtml}
+                                </div>
+                            </div>
+
+                            <div class="w-full ${slide.theme.noteBg} rounded-2xl p-3 border ${slide.theme.noteBorder} mt-3 text-center">
+                                <p class="text-xs sm:text-sm ${slide.theme.noteText} font-bold">
+                                    <i class="fa-solid fa-lightbulb ${slide.theme.accentText} mr-1"></i> ヒント: ā, ī, ū, ē, ō は長音（のばす音）を表すよ！
+                                </p>
+                            </div>
+                        `;
+                    } else {
+                        // Answer
+                        slideEl.innerHTML = `
+                            <div class="w-full flex items-center justify-between border-b-2 border-slate-100 pb-3 mb-2">
+                                <span class="bg-emerald-100 text-emerald-800 text-xs sm:text-sm font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-check"></i> こたえ！
+                                </span>
+                                <span class="text-xs sm:text-sm font-bold text-slate-400">
+                                    ${secText}秒後に つぎへ
+                                </span>
+                            </div>
+
+                            <div class="text-center my-auto flex flex-col items-center w-full">
+                                <span class="text-5xl sm:text-7xl mb-2 drop-shadow-sm">${slide.icon}</span>
+                                <div class="pop-in text-5xl sm:text-7xl font-black text-slate-800 tracking-wider mb-2 drop-shadow-md">
+                                    ${slide.word}
+                                </div>
+                                <div class="text-2xl font-black text-emerald-600 tracking-wider">
+                                    (${slide.hepburn})
+                                </div>
+                            </div>
+
+                            <div class="w-full ${slide.theme.noteBg} rounded-2xl p-3 border ${slide.theme.noteBorder} mt-3 text-center">
+                                <p class="text-xs sm:text-sm ${slide.theme.noteText} font-black">
+                                    <i class="fa-solid fa-star ${slide.theme.accentText} mr-1"></i> 解説: ${slide.note}
+                                </p>
+                            </div>
+                        `;
+                    }
+                }
+
+                slideContainer.appendChild(slideEl);
+            });
+
+            renderGridItems();
+        }
+
+        function renderGridItems() {
+            gridItemsList.innerHTML = '';
+            activeSlides.forEach((slide, idx) => {
+                const isQuestion = slide.type === 'question';
+                const itemBtn = document.createElement('button');
+                itemBtn.onclick = () => {
+                    showSlide(idx);
+                    toggleGridModal();
+                };
+                itemBtn.className = `p-3 rounded-2xl border text-left flex flex-col justify-between transition hover:scale-105 active:scale-95 ${
+                    idx === currentSlideIndex 
+                        ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-400' 
+                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                }`;
+
+                let titleText = '';
+                if (slide.mode === 'hiraToRoma') {
+                    titleText = isQuestion ? slide.word : slide.hepburn;
+                } else {
+                    titleText = isQuestion ? slide.hepburn : slide.word;
+                }
+
+                itemBtn.innerHTML = `
+                    <div class="flex items-center justify-between w-full mb-1">
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${isQuestion ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
+                            ${isQuestion ? '問' : '答'}
+                        </span>
+                        <span class="text-[10px] text-slate-400 font-bold">#${idx + 1}</span>
+                    </div>
+                    <div class="text-center my-1 flex items-center justify-center gap-1">
+                        <span class="text-sm">${slide.icon}</span>
+                        <span class="text-sm font-black ${isQuestion ? 'text-indigo-700' : 'text-emerald-600'}">
+                            ${titleText}
+                        </span>
+                    </div>
+                `;
+                gridItemsList.appendChild(itemBtn);
+            });
+        }
+
+        function showSlide(index) {
+            if (activeSlides.length === 0) return;
+
+            const currentCard = document.getElementById(`slide-${currentSlideIndex}`);
+            if (currentCard) {
+                currentCard.classList.remove('active');
+            }
+
+            currentSlideIndex = (index + activeSlides.length) % activeSlides.length;
+
+            const newCard = document.getElementById(`slide-${currentSlideIndex}`);
+            if (newCard) {
+                newCard.classList.add('active');
+            }
+
+            slideCounter.textContent = `${currentSlideIndex + 1} / ${activeSlides.length}`;
+            slideStartTime = performance.now();
+        }
+
+        function timerStep(now) {
+            if (!isPlaying) return;
+
+            if (!slideStartTime) slideStartTime = now;
+            const elapsed = now - slideStartTime;
+            const progress = Math.min(elapsed / DURATION_PER_SLIDE, 1);
+
+            timerBar.style.width = `${progress * 100}%`;
+
+            if (elapsed >= DURATION_PER_SLIDE) {
+                showSlide(currentSlideIndex + 1);
+            }
+
+            animationFrameId = requestAnimationFrame(timerStep);
+        }
+
+        function startTimer() {
+            if (!isPlaying) return;
+            slideStartTime = performance.now();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(timerStep);
+        }
+
+        function stopTimer() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+
+        function togglePlayPause() {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playIcon.className = "fa-solid fa-pause";
+                playText.textContent = "一時停止";
+                btnPlayPause.classList.add("pulse-btn");
+                btnPlayPause.classList.replace("bg-amber-500", "bg-emerald-500");
+                startTimer();
+            } else {
+                playIcon.className = "fa-solid fa-play";
+                playText.textContent = "さいせい";
+                btnPlayPause.classList.remove("pulse-btn");
+                btnPlayPause.classList.replace("bg-emerald-500", "bg-amber-500");
+                stopTimer();
+            }
+        }
+
+        function nextSlide() {
+            showSlide(currentSlideIndex + 1);
+            if (isPlaying) startTimer();
+        }
+
+        function prevSlide() {
+            showSlide(currentSlideIndex - 1);
+            if (isPlaying) startTimer();
+        }
+
+        function resetSlides() {
+            showSlide(0);
+            if (isPlaying) startTimer();
+        }
+
+        function changeSpeed(val) {
+            DURATION_PER_SLIDE = parseInt(val, 10);
+            const sec = DURATION_PER_SLIDE / 1000;
+            currentSpeedText.textContent = `${sec}秒`;
+            renderSlides();
+            showSlide(currentSlideIndex);
+            if (isPlaying) startTimer();
+        }
+
+        function changeMode(val) {
+            currentMode = val;
+            activeSlides = buildSlidesData(currentCategory, currentMode);
+            currentSlideIndex = 0;
+            renderSlides();
+            showSlide(0);
+            if (isPlaying) startTimer();
+        }
+
+        function filterCategory(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.className = 'cat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition shrink-0';
+            });
+            const selectedBtn = document.getElementById(`cat-${cat}`);
+            if (selectedBtn) {
+                selectedBtn.className = 'cat-btn bg-indigo-600 text-white px-3 py-1.5 rounded-lg shadow-sm transition shrink-0';
+            }
+
+            activeSlides = buildSlidesData(currentCategory, currentMode);
+            currentSlideIndex = 0;
+
+            renderSlides();
+            showSlide(0);
+            if (isPlaying) startTimer();
+        }
+
+        function toggleGridModal() {
+            if (gridModal.classList.contains('hidden')) {
+                renderGridItems();
+                gridModal.classList.remove('hidden');
+                gridModal.classList.add('flex');
+            } else {
+                gridModal.classList.add('hidden');
+                gridModal.classList.remove('flex');
+            }
+        }
+
+        // Keyboard navigation
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                prevSlide();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                togglePlayPause();
+            }
+        });
+
+        // Initialize App
+        window.addEventListener('load', () => {
+            activeSlides = buildSlidesData('all', 'hiraToRoma');
+            renderSlides();
+            showSlide(0);
+            startTimer();
+        });
+    </script>
+</body>
+</html>
