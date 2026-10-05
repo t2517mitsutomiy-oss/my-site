@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>国土地理院 白地図で覚える！日本地図 県名クイズ</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet Map CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Turf.js (GeoJSON Mask and Spatial calculations) -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Canvas Confetti for Completion Celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap');
+
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Leaflet Map Custom Styling */
+        #map {
+            width: 100%;
+            height: 100%;
+            min-height: 480px;
+            background-color: #cbd5e1;
+            border-radius: 1rem;
+            z-index: 10;
+        }
+
+        #modal-gsi-map {
+            width: 100%;
+            height: 100%;
+            background-color: #cbd5e1;
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+
+        /* Custom Leaflet Polygon Styling */
+        .leaflet-interactive {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer !important;
+        }
+
+        .leaflet-container {
+            background: #e2e8f0 !important;
+            font-family: 'Zen Maru Gothic', sans-serif;
+        }
+
+        /* Modal Pop Animation */
+        @keyframes modalPop {
+            0% { transform: scale(0.85); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-pop {
+            animation: modalPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        ruby rt {
+            font-size: 0.55em;
+            color: #38bdf8;
+            font-weight: 700;
+        }
+
+        /* Pulse animation for target polygon (Keeps fill-opacity 1.0 to prevent text leakage) */
+        @keyframes redPulse {
+            0% { fill-opacity: 1.0; stroke-width: 2.5px; stroke-opacity: 0.8; }
+            50% { fill-opacity: 1.0; stroke-width: 4.5px; stroke-opacity: 1.0; }
+            100% { fill-opacity: 1.0; stroke-width: 2.5px; stroke-opacity: 0.8; }
+        }
+
+        .pulse-target {
+            animation: redPulse 1.2s infinite ease-in-out;
+        }
+
+        /* Shake animation for wrong answer alert */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+
+        .animate-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* Loading Spinner Overlay */
+        #loading-overlay {
+            transition: opacity 0.3s ease;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
+
+    <!-- Top Header Navigation -->
+    <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur sticky top-0 z-30 px-3 py-2.5 sm:px-6">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5">
+            
+            <!-- Title -->
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-br from-emerald-400 to-teal-600 p-2 rounded-2xl shadow-lg text-slate-950 font-black text-xl">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-xl font-black text-white tracking-wide flex items-center gap-1.5">
+                        <ruby>国土地理院<rt>こくどちりいん</rt></ruby> <ruby>白地図<rt>はくちず</rt></ruby> <ruby>県名<rt>けんめい</rt></ruby>クイズ
+                    </h1>
+                    <p class="text-[11px] text-teal-400 font-bold">しょうがっこう3ねんせい向け 日本ちず学習アプリ</p>
+                </div>
+            </div>
+
+            <!-- Score & Progress Bar -->
+            <div class="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-3 bg-slate-950/80 px-3.5 py-1.5 rounded-2xl border border-slate-800">
+                <div class="text-xs font-black text-slate-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+                    <span>覚えた都道府県:</span>
+                    <span id="score-text" class="text-emerald-400 text-base sm:text-lg font-black ml-0.5">0</span>
+                    <span class="text-slate-500">/ 47</span>
+                </div>
+                <!-- Progress bar -->
+                <div class="w-24 sm:w-32 bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                    <div id="progress-bar" class="bg-gradient-to-r from-emerald-500 to-teal-300 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Main Interactive Map Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-4 flex flex-col gap-3">
+
+        <!-- Controls & Region Filter Bar -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold shadow-lg">
+            
+            <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+                <span class="text-slate-400 shrink-0 mr-1"><i class="fa-solid fa-filter text-teal-400"></i> ちほうで選ぶ:</span>
+                <button onclick="filterRegion('ALL')" class="region-btn bg-teal-500 text-slate-950 px-2.5 py-1 rounded-xl font-black transition hover:bg-teal-400 shrink-0">ぜんぶ</button>
+                <button onclick="filterRegion('北海道・東北')" class="region-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-2.5 py-1 rounded-xl transition shrink-0">北海道・東北</button>
+                <button onclick="filterRegion('関東')" class="region-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-2.5 py-1 rounded-xl transition shrink-0">関東</button>
+                <button onclick="filterRegion('中部')" class="region-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-2.5 py-1 rounded-xl transition shrink-0">中部</button>
+                <button onclick="filterRegion('近畿')" class="region-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-2.5 py-1 rounded-xl transition shrink-0">近畿</button>
+                <button onclick="filterRegion('中国・四国')" class="region-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-2.5 py-1 rounded-xl transition shrink-0">中国・四国</button>
+                <button onclick="filterRegion('九州・沖縄')" class="region-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-2.5 py-1 rounded-xl transition shrink-0">九州・沖縄</button>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <div class="flex items-center bg-slate-800 p-0.5 rounded-xl border border-slate-700">
+                    <button id="btn-tile-blank" onclick="switchMapStyle('blank')" class="px-2.5 py-1 rounded-lg text-xs font-black transition bg-teal-500 text-slate-950 shadow">
+                        <i class="fa-solid fa-map"></i> 白地図
+                    </button>
+                    <button id="btn-tile-std" onclick="switchMapStyle('std')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-palette"></i> カラー
+                    </button>
+                </div>
+                <button onclick="startRandomQuiz()" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black px-3.5 py-1.5 rounded-xl shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-dice"></i> ランダム出題
+                </button>
+                <button onclick="resetMapZoom()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl border border-slate-700 transition" title="日本全体を表示">
+                    <i class="fa-solid fa-compress-arrows-alt mr-1"></i> 全体
+                </button>
+                <button onclick="openResetModal()" class="bg-slate-800 hover:bg-rose-900/50 text-rose-300 hover:text-rose-200 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-rose-700/50 transition flex items-center gap-1.5 shrink-0" title="覚えた記録をクリアして最初から">
+                    <i class="fa-solid fa-rotate-left"></i> リセット
+                </button>
+            </div>
+        </div>
+
+        <!-- Leaflet Map Container -->
+        <div class="relative flex-1 min-h-[480px] sm:min-h-[560px] bg-slate-900 border-2 border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            
+            <!-- Guidance Overlay Banner -->
+            <div class="absolute top-3 left-3 z-20 bg-slate-950/90 backdrop-blur text-slate-200 border border-slate-700 px-3.5 py-2 rounded-2xl shadow-xl max-w-[280px] sm:max-w-xs pointer-events-none">
+                <p class="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-hand-pointer text-amber-400 animate-bounce"></i> 地図の県をタップしよう！
+                </p>
+                <p class="text-[11px] text-slate-300 mt-0.5 font-bold leading-tight">
+                    選択した県が<span class="text-red-400 font-extrabold">赤く</span>光り、国土地理院の形クイズが始まります。
+                </p>
+            </div>
+
+            <!-- Map Layer Legend -->
+            <div class="absolute bottom-3 left-3 z-20 bg-slate-950/90 text-[11px] text-slate-300 px-3 py-1.5 rounded-xl border border-slate-800 shadow flex items-center gap-3">
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span> 未挑戦</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> 挑戦中</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> 正解済み</span>
+            </div>
+
+            <!-- Leaflet Map Mount Point -->
+            <div id="map" class="w-full h-full flex-1 min-h-[480px]"></div>
+
+            <!-- Loading Overlay -->
+            <div id="loading-overlay" class="absolute inset-0 z-30 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center gap-3 pointer-events-none transition-opacity duration-300 opacity-0 hidden">
+                <div class="w-10 h-10 border-4 border-teal-400 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-sm font-bold text-teal-300"><i class="fa-solid fa-map-marked-alt mr-1.5"></i> 地図データを準備中...</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Interactive Quiz Modal -->
+    <div id="quiz-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden">
+        <div class="bg-slate-900 rounded-3xl shadow-2xl border-2 border-slate-700 max-w-lg w-full p-3.5 sm:p-5 relative modal-pop overflow-y-auto max-h-[92vh] text-slate-100">
+            
+            <!-- Modal Close Button -->
+            <button onclick="closeQuizModal()" class="absolute top-3.5 right-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 w-8 h-8 rounded-full flex items-center justify-center font-black text-base transition shadow border border-slate-600 z-30">
+                ✕
+            </button>
+
+            <!-- Quiz Header -->
+            <div class="text-center mb-2">
+                <span id="modal-region-badge" class="inline-block bg-teal-500/20 text-teal-300 text-xs font-black px-3 py-0.5 rounded-full border border-teal-500/30 mb-0.5">
+                    かんとう地方
+                </span>
+                <h2 class="text-base sm:text-xl font-black text-white flex justify-center items-center gap-1.5">
+                    この <ruby>都道府県<rt>とどうふけん</rt></ruby> は どこかな？
+                </h2>
+            </div>
+
+            <!-- High Precision GSI Tile Silhouette Container -->
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-1.5 flex flex-col items-center justify-center relative mb-2 shadow-inner">
+                <div class="w-full h-36 sm:h-44 rounded-xl overflow-hidden relative border border-slate-800 shadow">
+                    <!-- Real GSI Tile Mini-Map Mount -->
+                    <div id="modal-gsi-map"></div>
+
+                    <!-- GSI Tile Credit Badge -->
+                    <div class="absolute top-2 left-2 z-20 bg-slate-900/90 text-cyan-300 text-[10px] font-extrabold px-2 py-0.5 rounded-lg border border-slate-700 shadow flex items-center gap-1.5">
+                        <i class="fa-solid fa-layer-group text-teal-400"></i> 国土地理院 白地図 切り抜き
+                    </div>
+                </div>
+                <div class="mt-1 text-[10px] sm:text-[11px] text-slate-400 font-bold flex items-center justify-between w-full px-1">
+                    <span><i class="fa-solid fa-compass text-teal-400 mr-1"></i> 実際の形・海岸線</span>
+                    <span class="text-emerald-400 font-extrabold"><i class="fa-solid fa-circle-info mr-1"></i> 特徴的なシルエット</span>
+                </div>
+            </div>
+
+            <!-- Incorrect Answer Alert Banner -->
+            <div id="wrong-alert" class="hidden bg-rose-950/90 border-2 border-rose-500/70 text-rose-200 px-3 py-1.5 rounded-2xl mb-2 text-center text-xs font-black shadow-lg flex items-center justify-center gap-2">
+                <i class="fa-solid fa-circle-xmark text-rose-400 text-base"></i>
+                <span>ざんねん！ふせいかい… もういちど選んでみてね！</span>
+            </div>
+
+            <!-- Options Grid -->
+            <div id="options-grid" class="grid grid-cols-2 gap-2 mb-2">
+                <!-- Option buttons generated dynamically -->
+            </div>
+
+            <!-- Result Explanation Panel -->
+            <div id="result-panel" class="hidden bg-slate-950 border border-slate-800 rounded-2xl p-2.5 sm:p-3 text-xs leading-relaxed animate-fade-in">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-1.5">
+                    <div>
+                        <span class="text-emerald-400 font-black text-sm sm:text-base mr-2" id="res-pref-name">東京都</span>
+                        <span class="text-slate-400 font-bold text-xs" id="res-pref-kana">とうきょうと</span>
+                    </div>
+                    <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-extrabold text-[10px] sm:text-[11px]">
+                        <i class="fa-solid fa-circle-check mr-1"></i> 正解！
+                    </span>
+                </div>
+
+                <div class="space-y-0.5 text-slate-300">
+                    <p><strong class="text-teal-300">📍 <ruby>県庁所在地<rt>けんちょうしょざいち</rt></ruby>:</strong> <span id="res-capital">新宿区</span></p>
+                    <p><strong class="text-amber-300">💡 ものしりメモ:</strong> <span id="res-hint">特長テキスト</span></p>
+                </div>
+
+                <button onclick="closeQuizModal()" class="w-full mt-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black py-2 rounded-xl transition shadow text-xs sm:text-sm">
+                    つぎの <ruby>都道府県<rt>とどうふけん</rt></ruby> に挑戦する！
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Reset Confirmation Modal -->
+    <div id="reset-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+        <div class="bg-slate-900 rounded-3xl shadow-2xl border-2 border-slate-700 max-w-sm w-full p-5 relative modal-pop text-slate-100 text-center">
+            <div class="w-12 h-12 bg-rose-500/20 border border-rose-500/40 rounded-2xl flex items-center justify-center text-rose-400 text-2xl mx-auto mb-3">
+                <i class="fa-solid fa-rotate-left"></i>
+            </div>
+            <h3 class="text-lg font-black text-white mb-2">さいしょから やりなおす？</h3>
+            <p class="text-xs text-slate-300 font-bold mb-5 leading-relaxed">
+                これまで覚えた <span id="reset-count-badge" class="text-amber-400 font-black">0</span> 個のきろくが消えて、0個からスタートになります。
+            </p>
+            <div class="flex items-center gap-2">
+                <button onclick="closeResetModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl border border-slate-700 transition text-xs">
+                    やめる
+                </button>
+                <button onclick="confirmResetProgress()" class="flex-1 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white font-black py-2.5 rounded-xl shadow transition text-xs">
+                    やりなおす
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* 47 Prefectures Data with Spatial Coordinates & Bounding Boxes */
+        const PREFECTURES_DATA = [
+            { code: 1, name: "北海道", kana: "ほっかいどう", region: "北海道・東北", capital: "札幌市（さっぽろし）", hint: "知床半島や積丹半島、渡島半島をかかえる日本で一番大きな面積の都道府県！", center: [43.0642, 141.3468], bounds: [[41.3, 139.3], [45.5, 145.8]] },
+            { code: 2, name: "青森県", kana: "あおもりけん", region: "北海道・東北", capital: "青森市（あおもりし）", hint: "津軽半島と下北半島がむつ湾をかこむ本州最北の県！りんごが有名。", center: [40.8244, 140.7400], bounds: [[40.2, 139.8], [41.6, 141.7]] },
+            { code: 3, name: "岩手県", kana: "いわてけん", region: "北海道・東北", capital: "盛岡市（もりおかし）", hint: "リアス海岸の三陸海岸がある、本州で一番広い県！", center: [39.7036, 141.1527], bounds: [[38.9, 140.6], [40.5, 142.1]] },
+            { code: 4, name: "宮城県", kana: "みやぎけん", region: "北海道・東北", capital: "仙台市（せんだいし）", hint: "日本三景の松島と、牡鹿半島があるお米どころ！", center: [38.2688, 140.8721], bounds: [[37.7, 140.2], [39.0, 141.7]] },
+            { code: 5, name: "秋田県", kana: "あきたけん", region: "北海道・東北", capital: "秋田市（あきたし）", hint: "日本海に突き出た「男鹿半島（おがはんとう）」が目印！", center: [39.7186, 140.1024], bounds: [[38.9, 139.7], [40.5, 140.9]] },
+            { code: 6, name: "山形県", kana: "やまがたけん", region: "北海道・東北", capital: "山形市（やまがたし）", hint: "人の人の横顔の形（左を向いている横顔）に似ているよ！さくらんぼが有名。", center: [38.2404, 140.3633], bounds: [[37.7, 139.5], [39.2, 140.7]] },
+            { code: 7, name: "福島県", kana: "ふくしまけん", region: "北海道・東北", capital: "福島市（ふくしまし）", hint: "猪苗代湖（いなわしろこ）と磐梯山（ばんだいさん）が有名！", center: [37.7500, 140.4678], bounds: [[36.8, 139.2], [37.9, 141.0]] },
+
+            { code: 8, name: "茨城県", kana: "いばらきけん", region: "関東", capital: "水戸市（みとし）", hint: "日本で2番目に大きい湖「霞ヶ浦（かすみがうら）」があるよ！納豆が名物。", center: [36.3418, 140.4468], bounds: [[35.7, 139.7], [36.9, 140.8]] },
+            { code: 9, name: "栃木県", kana: "とちぎけん", region: "関東", capital: "宇都宮市（うつのみやし）", hint: "日光東照宮（にっこうとうしょうぐう）やイチゴ（とちおとめ）が有名！", center: [36.5658, 139.8836], bounds: [[36.2, 139.3], [37.2, 140.3]] },
+            { code: 10, name: "群馬県", kana: "ぐんまけん", region: "関東", capital: "前橋市（まえばしし）", hint: "かるたで「鶴舞う（つるまう）形の群馬県」と歌われる鶴の形！", center: [36.3911, 139.0608], bounds: [[36.0, 138.4], [37.0, 139.6]] },
+            { code: 11, name: "埼玉県", kana: "さいたまけん", region: "関東", capital: "さいたま市", hint: "海に面していない内陸県！草加せんべいや深谷ねぎが有名。", center: [35.8569, 139.6489], bounds: [[35.7, 138.7], [36.3, 139.9]] },
+            { code: 12, name: "千葉県", kana: "ちばけん", region: "関東", capital: "千葉市（ちばし）", hint: "太平洋に大きく突き出た房総半島（チーバくんの形）！", center: [35.6047, 140.1233], bounds: [[34.9, 139.7], [36.1, 140.9]] },
+            { code: 13, name: "東京都", kana: "とうきょうと", region: "関東", capital: "新宿区（しんじゅくく）", hint: "日本の首都！伊豆諸島や小笠原諸島の島々も含まれるよ。", center: [35.6895, 139.6917], bounds: [[35.5, 138.9], [35.9, 139.9]] },
+            { code: 14, name: "神奈川県", kana: "かながわけん", region: "関東", capital: "横浜市（よこはまし）", hint: "三浦半島と鎌倉、箱根の山々がある港町！", center: [35.4478, 139.6425], bounds: [[35.1, 138.9], [35.7, 139.8]] },
+
+            { code: 15, name: "新潟県", kana: "にいがたけん", region: "中部", capital: "新潟市（にいがたし）", hint: "日本海に面して長く伸びる県と、S字型の佐渡島（さどがしま）！", center: [37.9022, 139.0236], bounds: [[36.7, 137.8], [38.6, 139.9]] },
+            { code: 16, name: "富山県", kana: "とやまけん", region: "中部", capital: "富山市（とやまし）", hint: "富山湾の丸いお碗型と、立山連峰（たてやまれんぽう）！", center: [36.6953, 137.2113], bounds: [[36.2, 136.7], [37.0, 137.8]] },
+            { code: 17, name: "石川県", kana: "いしかわけん", region: "中部", capital: "金沢市（かなざわし）", hint: "北へ長く伸びる「能登半島（のとはんとう）」が一番の目印！", center: [36.5944, 136.6256], bounds: [[36.0, 136.2], [37.9, 137.4]] },
+            { code: 18, name: "福井県", kana: "ふくいけん", region: "中部", capital: "福井市（ふくいし）", hint: "恐竜の化石がたくさん見つかる県！東尋坊（とうじんぼう）も有名。", center: [36.0652, 136.2219], bounds: [[35.4, 135.4], [36.3, 136.8]] },
+            { code: 19, name: "山梨県", kana: "やまなしけん", region: "中部", capital: "甲府市（こうふし）", hint: "富士山の北側と南アルプスにかこまれた果物王国！", center: [35.6642, 138.5683], bounds: [[35.2, 138.2], [35.9, 139.1]] },
+            { code: 20, name: "長野県", kana: "ながのけん", region: "中部", capital: "長野市（ながのし）", hint: "日本アルプスの山々がそびえる、大きな鷲（わし）のような形！", center: [36.6513, 138.1811], bounds: [[35.2, 137.3], [37.0, 138.8]] },
+            { code: 21, name: "岐阜県", kana: "ぎふけん", region: "中部", capital: "岐阜市（ぎふし）", hint: "白川郷の合掌造りや清流長良川がある内陸の県！", center: [35.3912, 136.7223], bounds: [[35.1, 136.2], [36.5, 137.6]] },
+            { code: 22, name: "静岡県", kana: "しずおかけん", region: "中部", capital: "静岡市（しずおかし）", hint: "伊豆半島と駿河湾、浜名湖、そして富士山の南側！", center: [34.9756, 138.3828], bounds: [[34.5, 137.4], [35.6, 139.2]] },
+            { code: 23, name: "愛知県", kana: "あいちけん", region: "中部", capital: "名古屋市（なごやし）", hint: "知多半島と渥美半島がハサミのように海をはさむ形！", center: [35.1802, 136.9066], bounds: [[34.5, 136.6], [35.4, 137.8]] },
+
+            { code: 24, name: "三重県", kana: "みえけん", region: "近畿", capital: "津市（つし）", hint: "志摩半島の複雑な海岸線と伊勢神宮がある県！", center: [34.7303, 136.5086], bounds: [[33.7, 135.8], [35.2, 136.9]] },
+            { code: 25, name: "滋賀県", kana: "しがけん", region: "近畿", capital: "大津市（おおつし）", hint: "真ん中に日本最大の「琵琶湖（びわこ）」があるドーナツ型！", center: [35.0045, 135.8686], bounds: [[34.8, 135.8], [35.7, 136.4]] },
+            { code: 26, name: "京都府", kana: "きょうとふ", region: "近畿", capital: "京都市（きょうとし）", hint: "丹後半島（天橋立）から歴史ある京都盆地まで伸びる形！", center: [35.0211, 135.7556], bounds: [[34.7, 134.8], [35.8, 136.0]] },
+            { code: 27, name: "大阪府", kana: "おおさかふ", region: "近畿", capital: "大阪市（おおさかし）", hint: "大阪湾を三日月のようにかこむ、コンパクトな形！", center: [34.6937, 135.5023], bounds: [[34.2, 135.1], [35.0, 135.7]] },
+            { code: 28, name: "兵庫県", kana: "ひょうごけん", region: "近畿", capital: "神戸市（こうべし）", hint: "日本海と瀬戸内海の2つの海に面し、大きな淡路島もあるよ！", center: [34.6913, 135.1830], bounds: [[34.1, 134.2], [35.7, 135.5]] },
+            { code: 29, name: "奈良県", kana: "ならけん", region: "近畿", capital: "奈良市（ならし）", hint: "大仏さまのある東大寺や吉野山がある歴史ある内陸県！", center: [34.6851, 135.8048], bounds: [[33.8, 135.5], [34.8, 136.2]] },
+            { code: 30, name: "和歌山県", kana: "わかやまけん", region: "近畿", capital: "和歌山市（わかやまし）", hint: "紀伊半島の南側！本州最南端の潮岬（しおのみさき）があるよ。", center: [34.2260, 135.1675], bounds: [[33.4, 134.9], [34.4, 136.0]] },
+
+            { code: 31, name: "鳥取県", kana: "とっとりけん", region: "中国・四国", capital: "鳥取市（とっとりし）", hint: "日本最大級の鳥取砂丘（とっとりさきゅう）がある日本海側の県！", center: [35.5011, 134.2351], bounds: [[35.0, 133.1], [35.7, 134.4]] },
+            { code: 32, name: "島根県", kana: "しまねけん", region: "中国・四国", capital: "松江市（まつえし）", hint: "出雲大社と宍道湖（しんじこ）、沖合の隠岐諸島（おきしょとう）！", center: [35.4723, 133.0505], bounds: [[34.3, 131.6], [36.4, 133.4]] },
+            { code: 33, name: "岡山県", kana: "おかやまけん", region: "中国・四国", capital: "岡山市（おかやまし）", hint: "瀬戸大橋で四国とつながる県！桃太郎伝説やマスカットで有名。", center: [34.6618, 133.9350], bounds: [[34.3, 133.3], [35.3, 134.4]] },
+            { code: 34, name: "広島県", kana: "ひろしまけん", region: "中国・四国", capital: "広島市（ひろしまし）", hint: "海の上に立つ大鳥居の「厳島神社（いつくしまじんじゃ）」が有名！", center: [34.3963, 132.4594], bounds: [[34.0, 132.0], [35.1, 133.5]] },
+            { code: 35, name: "山口県", kana: "やまぐちけん", region: "中国・四国", capital: "山口市（やまぐちし）", hint: "本州の一番西の端！関門海峡（かんもんかいきょう）で九州と向かい合うよ。", center: [34.1780, 131.4738], bounds: [[33.7, 130.7], [34.8, 132.2]] },
+            { code: 36, name: "徳島県", kana: "とくしまけん", region: "中国・四国", capital: "徳島市（とくしまし）", hint: "鳴門（なると）の海峡の渦潮（うずしお）と阿波おどりが有名！", center: [34.0657, 134.5594], bounds: [[33.5, 133.6], [34.3, 134.8]] },
+            { code: 37, name: "香川県", kana: "かがわけん", region: "中国・四国", capital: "高松市（たかまつし）", hint: "日本で一番面積が小さな県！「讃岐うどん」で有名。", center: [34.3401, 134.0433], bounds: [[34.0, 133.4], [34.6, 134.5]] },
+            { code: 38, name: "愛媛県", kana: "えひめけん", region: "中国・四国", capital: "松山市（まつやまし）", hint: "針のように細長い「佐田岬半島（さだみさきはんとう）」が目印！", center: [33.8416, 132.7654], bounds: [[32.8, 132.0], [34.3, 133.7]] },
+            { code: 39, name: "高知県", kana: "こうちけん", region: "中国・四国", capital: "高知市（こうちし）", hint: "太平洋に向かって大きく弓なりにひろがる南国の県！", center: [33.5597, 133.5311], bounds: [[32.7, 132.4], [33.9, 134.3]] },
+
+            { code: 40, name: "福岡県", kana: "ふくおかけん", region: "九州・沖縄", capital: "福岡市（ふくおかし）", hint: "九州北部の中心都市！博多ラーメンや明太子が有名。", center: [33.6064, 130.4181], bounds: [[33.0, 130.0], [34.0, 131.2]] },
+            { code: 41, name: "佐賀県", kana: "さがけん", region: "九州・沖縄", capital: "佐賀市（さがし）", hint: "玄界灘と有明海のふたつの海に面した県！焼き物（有田焼）が有名。", center: [33.2494, 130.2988], bounds: [[32.9, 129.7], [33.6, 130.6]] },
+            { code: 42, name: "長崎県", kana: "ながさきけん", region: "九州・沖縄", capital: "長崎市（ながさきし）", hint: "島原半島や五島列島、対馬など日本の都道府県で一番島が多い！", center: [32.7503, 129.8777], bounds: [[32.0, 128.3], [34.7, 130.4]] },
+            { code: 43, name: "熊本県", kana: "くまもとけん", region: "九州・沖縄", capital: "熊本市（くまもとし）", hint: "大きなカルデラを持つ阿蘇山（あそさん）と天草諸島があるよ！", center: [32.7898, 130.7417], bounds: [[32.0, 129.9], [33.2, 131.3]] },
+            { code: 44, name: "大分県", kana: "おおいたけん", region: "九州・沖縄", capital: "大分市（おおいたし）", hint: "丸く突き出た「国東半島（くにさきはんとう）」と別府温泉！", center: [33.2382, 131.6126], bounds: [[32.7, 130.8], [33.7, 132.1]] },
+            { code: 45, name: "宮崎県", kana: "みやざきけん", region: "九州・沖縄", capital: "宮崎市（みやざきし）", hint: "太平洋に面して南北にまっすぐ伸びる、日向灘の県！", center: [31.9077, 131.4202], bounds: [[31.3, 130.7], [32.8, 131.9]] },
+            { code: 46, name: "鹿児島県", kana: "かごしまけん", region: "九州・沖縄", capital: "鹿児島市（かごしまし）", hint: "薩摩・大隅半島と桜島、屋久島や奄美群島の南の島々！", center: [31.5966, 130.5571], bounds: [[27.0, 128.4], [32.3, 131.3]] },
+            { code: 47, name: "沖縄県", kana: "おきなわけん", region: "九州・沖縄", capital: "那覇市（なはし）", hint: "美しいサンゴ礁の海と、沖縄本島・宮古・八重山諸島！", center: [26.2124, 127.6809], bounds: [[24.0, 122.9], [27.1, 128.4]] }
+        ];
+
+        /* Fallback Tile URLs (Strictly API-Key-Free Sources) */
+        const TILE_SOURCES = {
+            blank: [
+                'https://cyberjapandata.gsi.go.jp/xyz/blank/{z}/{x}/{y}.png',
+                'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+            ],
+            std: [
+                'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ]
+        };
+
+        /* Tile URLs dictionary for modal & main map */
+        const TILE_URLS = {
+            blank: 'https://cyberjapandata.gsi.go.jp/xyz/blank/{z}/{x}/{y}.png',
+            std: 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png'
+        };
+
+        /* Main Application State */
+        let mainMap = null;
+        let prefLayers = {};
+        let geojsonData = null;
+        let clearedPrefectures = new Set(JSON.parse(localStorage.getItem('gsi_cleared_prefs') || '[]'));
+        let currentTargetPref = null;
+
+        /* Tile Style State */
+        let currentTileStyle = 'blank';
+        let mainTileLayer = null;
+        let modalTileLayer = null;
+
+        /* Modal Leaflet Map State */
+        let modalMap = null;
+        let modalMaskLayer = null;
+        let modalTargetLayer = null;
+
+        /* Web Audio API Sound Generator */
+        let audioContext = null;
+
+        function playSound(type) {
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                const now = audioContext.currentTime;
+                if (type === 'click') {
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'correct') {
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.08);
+                    osc.frequency.setValueAtTime(783.99, now + 0.16);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(180, now + 0.12);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                }
+            } catch (e) {
+                // Ignore audio errors
+            }
+        }
+
+        /* Initialize Main Leaflet Map */
+        async function initMainMap() {
+            if (mainMap) {
+                mainMap.invalidateSize();
+                return;
+            }
+
+            mainMap = L.map('map', {
+                center: [37.8, 137.6],
+                zoom: 5.5,
+                zoomSnap: 0.25,
+                minZoom: 4.5,
+                maxZoom: 10,
+                attributionControl: false
+            });
+
+            setupMainTileLayer();
+
+            L.control.attribution({ position: 'bottomright', prefix: '国土地理院 / OpenStreetMap' }).addTo(mainMap);
+
+            loadGeoJsonData().then(() => {
+                renderPrefectureOverlays();
+            }).catch(() => {
+                renderPrefectureOverlays();
+            });
+
+            setTimeout(() => {
+                if (mainMap) mainMap.invalidateSize();
+            }, 100);
+
+            updateScoreBoard();
+        }
+
+        /* Setup Main Tile Layer */
+        function setupMainTileLayer() {
+            const urls = TILE_SOURCES[currentTileStyle];
+            let sourceIdx = 0;
+
+            function createTileLayer(url) {
+                return L.tileLayer(url, {
+                    maxZoom: 14,
+                    crossOrigin: true
+                });
+            }
+
+            if (mainTileLayer && mainMap.hasLayer(mainTileLayer)) {
+                mainMap.removeLayer(mainTileLayer);
+            }
+
+            mainTileLayer = createTileLayer(urls[sourceIdx]);
+            
+            mainTileLayer.on('tileerror', function() {
+                if (sourceIdx < urls.length - 1) {
+                    sourceIdx++;
+                    if (mainMap.hasLayer(mainTileLayer)) mainMap.removeLayer(mainTileLayer);
+                    mainTileLayer = createTileLayer(urls[sourceIdx]);
+                    mainTileLayer.addTo(mainMap);
+                }
+            });
+
+            mainTileLayer.addTo(mainMap);
+        }
+
+        /* Fetch GeoJSON */
+        async function loadGeoJsonData() {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            
+            const geojsonUrls = [
+                'https://cdn.jsdelivr.net/npm/open-data-jp-prefectures-geojson@1.1.0/output/japan.geojson',
+                'https://raw.githubusercontent.com/codeforjapan/mapprint/master/data/japan.geojson',
+                'https://raw.githubusercontent.com/dotnsf/geojsonjapan/master/japan.geojson'
+            ];
+
+            for (const url of geojsonUrls) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+                    const response = await fetch(url, { 
+                        signal: controller.signal,
+                        mode: 'cors'
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) continue;
+
+                    const text = await response.text();
+                    const trimmed = text.trim();
+
+                    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) continue;
+
+                    const parsed = JSON.parse(trimmed);
+                    if (parsed && parsed.features && parsed.features.length > 0) {
+                        geojsonData = parsed;
+                        break;
+                    }
+                } catch (err) {
+                    // Fallback
+                }
+            }
+
+            if (loadingOverlay) {
+                loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        /* Helper to get GeoJSON Feature for a Prefecture */
+        function getPrefGeoJsonFeature(pref) {
+            if (!geojsonData || !geojsonData.features) return null;
+            return geojsonData.features.find(f => {
+                if (!f.properties) return false;
+                const p = f.properties;
+                const name = p.nam_ja || p.nam || p.name || p.nam_jp || p.prefecture || '';
+                const code = p.code || p.id || p.pref;
+                
+                if (code && parseInt(code) === pref.code) return true;
+
+                const prefNameNorm = pref.name.replace(/(都|府|県)$/, '');
+                const featNameNorm = String(name).replace(/(都|府|県)$/, '');
+                
+                return name === pref.name || (featNameNorm.length > 0 && featNameNorm === prefNameNorm);
+            });
+        }
+
+        /* Render Interactive Layers for prefectures */
+        function renderPrefectureOverlays() {
+            PREFECTURES_DATA.forEach(pref => {
+                const feature = getPrefGeoJsonFeature(pref);
+                const isCleared = clearedPrefectures.has(pref.code);
+                let layer;
+
+                if (feature) {
+                    layer = L.geoJSON(feature, {
+                        style: {
+                            color: isCleared ? '#059669' : '#0284c7',
+                            weight: 1.8,
+                            fillColor: isCleared ? '#10b981' : '#38bdf8',
+                            fillOpacity: isCleared ? 0.6 : 0.25
+                        }
+                    }).addTo(mainMap);
+                } else {
+                    const bounds = pref.bounds;
+                    const polygonCoords = [
+                        [bounds[0][0], bounds[0][1]],
+                        [bounds[0][0], bounds[1][1]],
+                        [bounds[1][0], bounds[1][1]],
+                        [bounds[1][0], bounds[0][1]]
+                    ];
+                    layer = L.polygon(polygonCoords, {
+                        color: isCleared ? '#059669' : '#0284c7',
+                        weight: 2,
+                        fillColor: isCleared ? '#10b981' : '#38bdf8',
+                        fillOpacity: isCleared ? 0.6 : 0.25,
+                        dashArray: '3, 3'
+                    }).addTo(mainMap);
+                }
+
+                layer.on('mouseover', function () {
+                    if (currentTargetPref?.code !== pref.code) {
+                        this.setStyle({
+                            fillOpacity: 0.65,
+                            weight: 3,
+                            color: '#0284c7'
+                        });
+                    }
+                });
+
+                layer.on('mouseout', function () {
+                    if (currentTargetPref?.code !== pref.code) {
+                        const cleared = clearedPrefectures.has(pref.code);
+                        this.setStyle({
+                            fillOpacity: cleared ? 0.6 : 0.25,
+                            weight: cleared ? 1.8 : 1.8,
+                            color: cleared ? '#059669' : '#0284c7'
+                        });
+                    }
+                });
+
+                layer.on('click', function () {
+                    onSelectPrefecture(pref);
+                });
+
+                prefLayers[pref.code] = layer;
+            });
+        }
+
+        /* Handle Prefecture Click Event */
+        function onSelectPrefecture(pref) {
+            playSound('click');
+            currentTargetPref = pref;
+
+            Object.keys(prefLayers).forEach(code => {
+                const layer = prefLayers[code];
+                const cleared = clearedPrefectures.has(parseInt(code));
+                if (parseInt(code) === pref.code) {
+                    layer.setStyle({
+                        fillColor: '#ef4444',
+                        color: '#b91c1c',
+                        fillOpacity: 0.85,
+                        weight: 3.5
+                    });
+                } else {
+                    layer.setStyle({
+                        fillColor: cleared ? '#10b981' : '#38bdf8',
+                        color: cleared ? '#059669' : '#0284c7',
+                        fillOpacity: cleared ? 0.6 : 0.25,
+                        weight: 1.8
+                    });
+                }
+            });
+
+            openQuizModal(pref);
+        }
+
+        /* Initialize Modal Map Silhouette */
+        function initModalGsiMap() {
+            if (modalMap) return;
+
+            modalMap = L.map('modal-gsi-map', {
+                zoomControl: false,
+                dragging: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                touchZoom: false,
+                attributionControl: false
+            });
+
+            modalTileLayer = L.tileLayer(TILE_URLS[currentTileStyle], {
+                maxZoom: 14
+            }).addTo(modalMap);
+        }
+
+        function renderModalGsiSilhouette(pref) {
+            initModalGsiMap();
+
+            if (modalTileLayer && modalMap) {
+                modalMap.removeLayer(modalTileLayer);
+                modalTileLayer = L.tileLayer(TILE_URLS[currentTileStyle], {
+                    maxZoom: 14
+                }).addTo(modalMap);
+            }
+
+            if (modalMaskLayer) {
+                modalMap.removeLayer(modalMaskLayer);
+            }
+            if (modalTargetLayer) {
+                modalMap.removeLayer(modalTargetLayer);
+            }
+
+            const feature = getPrefGeoJsonFeature(pref);
+
+            if (feature && typeof turf !== 'undefined') {
+                const worldPolygon = turf.polygon([[
+                    [-180, 90], [180, 90], [180, -90], [-180, -90], [-180, 90]
+                ]]);
+                
+                try {
+                    const maskedGeoJson = turf.mask(feature, worldPolygon);
+                    modalMaskLayer = L.geoJSON(maskedGeoJson, {
+                        style: {
+                            color: '#020617',
+                            fillColor: '#020617',
+                            fillOpacity: 1.0, // 完全不透明にして周りの県名テキストを完全に隠す
+                            weight: 1
+                        }
+                    }).addTo(modalMap);
+                } catch (e) {
+                    // Fallback
+                }
+
+                modalTargetLayer = L.geoJSON(feature, {
+                    style: {
+                        color: '#dc2626',
+                        fillColor: '#ef4444',
+                        fillOpacity: 1.0, // 完全不透明にして対象県の文字（「佐賀」など）が透けないようにする
+                        weight: 3.5,
+                        className: 'pulse-target'
+                    }
+                }).addTo(modalMap);
+
+                setTimeout(() => {
+                    if (modalMap && modalTargetLayer) {
+                        modalMap.fitBounds(modalTargetLayer.getBounds(), { padding: [20, 20] });
+                    }
+                }, 50);
+            } else if (modalMap) {
+                modalMap.setView(pref.center, 7);
+            }
+        }
+
+        /* Switch Map Tile Style */
+        function switchMapStyle(style) {
+            if (currentTileStyle === style) return;
+            playSound('click');
+            currentTileStyle = style;
+
+            setupMainTileLayer();
+
+            if (modalMap && modalTileLayer) {
+                modalMap.removeLayer(modalTileLayer);
+                const urls = TILE_SOURCES[currentTileStyle];
+                modalTileLayer = L.tileLayer(urls[0], { maxZoom: 14, crossOrigin: true }).addTo(modalMap);
+            }
+
+            const btnBlank = document.getElementById('btn-tile-blank');
+            const btnStd = document.getElementById('btn-tile-std');
+
+            if (btnBlank && btnStd) {
+                if (style === 'blank') {
+                    btnBlank.className = 'px-2.5 py-1 rounded-lg text-xs font-black transition bg-teal-500 text-slate-950 shadow';
+                    btnStd.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+                } else {
+                    btnStd.className = 'px-2.5 py-1 rounded-lg text-xs font-black transition bg-amber-400 text-slate-950 shadow';
+                    btnBlank.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+                }
+            }
+        }
+
+        /* Open Quiz Modal Dialogue */
+        function openQuizModal(pref) {
+            document.getElementById('modal-region-badge').textContent = `${pref.region}地方`;
+            
+            document.getElementById('result-panel').classList.add('hidden');
+            const wrongAlert = document.getElementById('wrong-alert');
+            wrongAlert.classList.add('hidden');
+            wrongAlert.classList.remove('animate-shake');
+
+            generateQuizOptions(pref);
+
+            const modal = document.getElementById('quiz-modal');
+            modal.classList.remove('hidden');
+
+            renderModalGsiSilhouette(pref);
+        }
+
+        /* Generate Options */
+        function generateQuizOptions(correctPref) {
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+
+            const distractors = PREFECTURES_DATA.filter(p => p.code !== correctPref.code);
+            distractors.sort(() => Math.random() - 0.5);
+
+            const choices = [correctPref, ...distractors.slice(0, 3)];
+            choices.sort(() => Math.random() - 0.5);
+
+            choices.forEach(pref => {
+                const btn = document.createElement('button');
+                btn.className = 'opt-btn bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-extrabold border-2 border-slate-700 py-2 sm:py-2.5 px-2 rounded-2xl transition shadow flex flex-col items-center justify-center text-xs sm:text-sm';
+                btn.innerHTML = `<ruby>${pref.name}<rt>${pref.kana}</rt></ruby>`;
+                
+                btn.onclick = function() {
+                    checkAnswer(pref, correctPref, this);
+                };
+
+                grid.appendChild(btn);
+            });
+        }
+
+        /* Answer Checking Handler */
+        function checkAnswer(selectedPref, correctPref, btnElement) {
+            const allOptionBtns = document.querySelectorAll('.opt-btn');
+            const wrongAlert = document.getElementById('wrong-alert');
+
+            if (selectedPref.code === correctPref.code) {
+                playSound('correct');
+                
+                wrongAlert.classList.add('hidden');
+
+                btnElement.classList.remove('bg-slate-800', 'border-slate-700', 'hover:bg-slate-700');
+                btnElement.classList.add('bg-emerald-500', 'border-emerald-400', 'text-slate-950');
+
+                allOptionBtns.forEach(b => b.disabled = true);
+
+                clearedPrefectures.add(correctPref.code);
+                localStorage.setItem('gsi_cleared_prefs', JSON.stringify([...clearedPrefectures]));
+
+                const layer = prefLayers[correctPref.code];
+                if (layer) {
+                    layer.setStyle({
+                        fillColor: '#10b981',
+                        color: '#059669',
+                        fillOpacity: 0.65
+                    });
+                }
+
+                updateScoreBoard();
+
+                document.getElementById('res-pref-name').textContent = correctPref.name;
+                document.getElementById('res-pref-kana').textContent = correctPref.kana;
+                document.getElementById('res-capital').textContent = correctPref.capital;
+                document.getElementById('res-hint').textContent = correctPref.hint;
+                document.getElementById('result-panel').classList.remove('hidden');
+
+                if (clearedPrefectures.size === 47) {
+                    setTimeout(() => {
+                        triggerConfetti();
+                    }, 300);
+                }
+
+            } else {
+                playSound('wrong');
+                btnElement.classList.remove('bg-slate-800', 'border-slate-700');
+                btnElement.classList.add('bg-rose-500/30', 'border-rose-500', 'text-rose-300', 'line-through');
+                btnElement.disabled = true;
+
+                wrongAlert.classList.remove('hidden');
+                wrongAlert.classList.remove('animate-shake');
+                void wrongAlert.offsetWidth;
+                wrongAlert.classList.add('animate-shake');
+            }
+        }
+
+        /* Close Quiz Modal */
+        function closeQuizModal() {
+            document.getElementById('quiz-modal').classList.add('hidden');
+            currentTargetPref = null;
+
+            Object.keys(prefLayers).forEach(code => {
+                const layer = prefLayers[code];
+                const cleared = clearedPrefectures.has(parseInt(code));
+                layer.setStyle({
+                    fillColor: cleared ? '#10b981' : '#38bdf8',
+                    color: cleared ? '#059669' : '#0284c7',
+                    fillOpacity: cleared ? 0.6 : 0.25,
+                    weight: 1.8
+                });
+            });
+        }
+
+        /* Update Score Counter & Progress Bar */
+        function updateScoreBoard() {
+            const count = clearedPrefectures.size;
+            document.getElementById('score-text').textContent = count;
+            const percentage = Math.round((count / 47) * 100);
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+        }
+
+        /* Filter Map by Region */
+        function filterRegion(regionName) {
+            playSound('click');
+
+            document.querySelectorAll('.region-btn').forEach(btn => {
+                if ((regionName === 'ALL' && btn.textContent.includes('ぜんぶ')) || btn.textContent.includes(regionName)) {
+                    btn.className = 'region-btn bg-teal-500 text-slate-950 px-2.5 py-1 rounded-xl font-black transition shrink-0';
+                } else {
+                    btn.className = 'region-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-2.5 py-1 rounded-xl transition shrink-0';
+                }
+            });
+
+            if (regionName === 'ALL') {
+                resetMapZoom();
+                return;
+            }
+
+            const regionPrefs = PREFECTURES_DATA.filter(p => p.region === regionName);
+            if (regionPrefs.length > 0) {
+                const lats = regionPrefs.map(p => p.center[0]);
+                const lngs = regionPrefs.map(p => p.center[1]);
+                const minLat = Math.min(...lats) - 0.8;
+                const maxLat = Math.max(...lats) + 0.8;
+                const minLng = Math.min(...lngs) - 0.8;
+                const maxLng = Math.max(...lngs) + 0.8;
+
+                mainMap.fitBounds([[minLat, minLng], [maxLat, maxLng]], { animate: true, duration: 0.8 });
+            }
+        }
+
+        /* Reset Camera */
+        function resetMapZoom() {
+            mainMap.setView([37.8, 137.6], 5.5, { animate: true });
+        }
+
+        /* Pick a Random Quiz */
+        function startRandomQuiz() {
+            playSound('click');
+            const uncleared = PREFECTURES_DATA.filter(p => !clearedPrefectures.has(p.code));
+            const pool = uncleared.length > 0 ? uncleared : PREFECTURES_DATA;
+            const randomPref = pool[Math.floor(Math.random() * pool.length)];
+            
+            mainMap.flyTo(randomPref.center, 7, { duration: 0.8 });
+            setTimeout(() => {
+                onSelectPrefecture(randomPref);
+            }, 850);
+        }
+
+        /* Canvas Confetti */
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        /* Open Reset Confirmation Modal */
+        function openResetModal() {
+            playSound('click');
+            const countBadge = document.getElementById('reset-count-badge');
+            if (countBadge) countBadge.textContent = clearedPrefectures.size;
+            const modal = document.getElementById('reset-modal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        /* Close Reset Confirmation Modal */
+        function closeResetModal() {
+            const modal = document.getElementById('reset-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        /* Reset All Cleared Prefectures Progress */
+        function confirmResetProgress() {
+            playSound('click');
+            clearedPrefectures.clear();
+            localStorage.removeItem('gsi_cleared_prefs');
+            
+            // Map Polygon Color Reset
+            Object.keys(prefLayers).forEach(code => {
+                const layer = prefLayers[code];
+                if (layer) {
+                    layer.setStyle({
+                        fillColor: '#38bdf8',
+                        color: '#0284c7',
+                        fillOpacity: 0.25,
+                        weight: 1.8
+                    });
+                }
+            });
+
+            updateScoreBoard();
+            closeResetModal();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initMainMap();
+        });
+
+        window.addEventListener('load', () => {
+            if (mainMap) mainMap.invalidateSize();
+        });
+
+        window.addEventListener('resize', () => {
+            if (mainMap) mainMap.invalidateSize();
+        });
+    </script>
+</body>
+</html>
